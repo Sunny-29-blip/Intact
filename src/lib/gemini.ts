@@ -9,7 +9,11 @@ import {
   type GeminiComparisonResponse,
 } from "@/lib/prompts/compare";
 
-const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+let aiClient: GoogleGenAI | null = null;
+function getAi(): GoogleGenAI {
+  if (!aiClient) aiClient = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  return aiClient;
+}
 
 export interface ComparePhotosParams {
   moveInBase64: string;
@@ -49,7 +53,7 @@ export async function comparePhotosWithGemini(
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const responsePromise = ai.models.generateContent({
+      const responsePromise = getAi().models.generateContent({
         model: env.GEMINI_MODEL,
         contents: [
           {
