@@ -9,82 +9,65 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        paper: {
-          50: "#FAF8F5", // Warm off-white page background
-          100: "#F4F0EA",
-          200: "#EAE3D9",
-          300: "#DCD3C5",
-        },
+        page: "#F4F5F7", // Archival cool grey-white page background
+        surface: "#FFFFFF",
         ink: {
-          900: "#1C1917", // Primary near-black body text
-          700: "#44403C",
-          600: "#57534E", // Secondary text
-          500: "#78716C", // Muted text
-          300: "#A8A29E",
-          200: "#D6CEBE", // Default border
-          100: "#E7E2DA", // Subtle border
+          900: "#1C1E21", // Primary text
+          700: "#373B40",
+          600: "#4A4E54", // Secondary text
+          500: "#6B7078", // Muted metadata
+          400: "#9CA3AF", // Strong border
+          200: "#D1D5DB", // Default border
+          100: "#E5E7EB", // Subtle divider
+          50: "#F4F5F7",
         },
         accent: {
-          DEFAULT: "#1E3A5F", // Deep ink blue primary accent
-          hover: "#152A45",
-          subtle: "#EEF2F6",
-          border: "#CBD5E1",
+          DEFAULT: "#0B3D4A", // Deep teal primary accent
+          hover: "#072E38",
+          tint: "#E0F0F3",
+          border: "#B2D7DF",
         },
         damage: {
-          DEFAULT: "#991B1B", // Muted red text
-          bg: "#FEF2F2",
-          border: "#FECACA",
+          DEFAULT: "#A63D3D", // Damage solid
+          bg: "#FDF2F2",
+          border: "#F8D7D7",
         },
         wear: {
-          DEFAULT: "#B45309", // Ochre/amber text
-          bg: "#FFFBEB",
-          border: "#FDE68A",
+          DEFAULT: "#8A6A1A", // Normal wear solid
+          bg: "#FEF9EC",
+          border: "#F6E3B4",
         },
         unclear: {
-          DEFAULT: "#4B5563", // Neutral slate grey text
-          bg: "#F3F4F6",
-          border: "#E5E7EB",
+          DEFAULT: "#5A5F66", // Unclear neutral grey
+          bg: "#F4F5F7",
+          border: "#D1D5DB",
         },
         accepted: {
-          DEFAULT: "#166534", // Muted forest green text
-          bg: "#F0FDF4",
-          border: "#BBF7D0",
+          DEFAULT: "#2A5C4A", // Tenant accepted green
+          bg: "#EDF7F3",
+          border: "#C3E6D9",
         },
         disputed: {
-          DEFAULT: "#9F1239", // Muted rose/crimson text
-          bg: "#FFF1F2",
-          border: "#FECDD3",
+          DEFAULT: "#5C3D6B", // Tenant disputed purple/slate
+          bg: "#F7F0F9",
+          border: "#E4CEE9",
         },
       },
       borderRadius: {
+        none: "0",
         xs: "2px",
-        sm: "4px",
-        DEFAULT: "6px",
-        md: "6px",
+        sm: "2px",
+        DEFAULT: "3px",
+        md: "4px",
+        lg: "4px",
       },
       fontFamily: {
-        sans: [
-          "-apple-system",
-          "BlinkMacSystemFont",
-          '"Segoe UI"',
-          "Roboto",
-          '"Helvetica Neue"',
-          "Arial",
-          "sans-serif",
-        ],
-        mono: [
-          "ui-monospace",
-          "SFMono-Regular",
-          "Menlo",
-          "Monaco",
-          "Consolas",
-          '"Liberation Mono"',
-          '"Courier New"',
-          "monospace",
-        ],
+        sans: ["var(--font-plex-sans)", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-plex-mono)", "ui-monospace", "monospace"],
       },
       boxShadow: {
-        subtle: "0 1px 2px 0 rgba(0, 0, 0, 0.04)",
+        none: "none",
+        subtle: "0 1px 1px 0 rgba(0, 0, 0, 0.04)",
       },
     },
   },

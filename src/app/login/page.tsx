@@ -52,28 +52,28 @@ function LoginForm() {
   };
 
   return (
-    <div className="bg-white border border-ink-200 rounded p-6 sm:p-8">
-      <div className="border-b border-ink-100 pb-4 mb-6">
-        <div className="text-xs font-mono uppercase text-ink-500 tracking-wider">
-          Tenancy Evidence Record
+    <div className="bg-surface border border-ink-200 p-6 sm:p-8">
+      <div className="border-b border-ink-200 pb-4 mb-6">
+        <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+          AUTHENTICATION REGISTER
         </div>
         <h1 className="text-xl font-bold tracking-tight text-ink-900 mt-1">
           Sign In to Intact
         </h1>
-        <p className="text-sm text-ink-600 mt-1">
-          Access your property move-in and move-out condition records.
+        <p className="text-xs text-ink-600 mt-1">
+          Access your property tenancy condition records.
         </p>
       </div>
 
       {errors.general && (
-        <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage rounded">
+        <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage">
           {errors.general}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-ink-700 uppercase tracking-wider mb-1">
+          <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
             Email Address
           </label>
           <input
@@ -82,19 +82,19 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tenant@example.com"
             disabled={loading}
-            className={`w-full px-3 py-2 text-sm border rounded bg-paper-50 focus:bg-white focus:outline-none transition-colors ${
+            className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
               errors.email
                 ? "border-damage focus:border-damage"
                 : "border-ink-200 focus:border-accent"
             }`}
           />
           {errors.email && (
-            <p className="text-xs text-damage mt-1">{errors.email}</p>
+            <p className="text-[11px] text-damage mt-1 font-mono">{errors.email}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-ink-700 uppercase tracking-wider mb-1">
+          <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
             Password
           </label>
           <input
@@ -103,23 +103,23 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             disabled={loading}
-            className={`w-full px-3 py-2 text-sm border rounded bg-paper-50 focus:bg-white focus:outline-none transition-colors ${
+            className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
               errors.password
                 ? "border-damage focus:border-damage"
                 : "border-ink-200 focus:border-accent"
             }`}
           />
           {errors.password && (
-            <p className="text-xs text-damage mt-1">{errors.password}</p>
+            <p className="text-[11px] text-damage mt-1 font-mono">{errors.password}</p>
           )}
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full mt-2 py-2.5 px-4 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded transition-colors disabled:opacity-50"
+          className="w-full mt-2 py-2.5 px-4 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
         >
-          {loading ? "Authenticating..." : "Sign In"}
+          {loading ? "Authenticating..." : "Sign In to Record"}
         </button>
       </form>
 
@@ -127,9 +127,9 @@ function LoginForm() {
         Do not have an account?{" "}
         <Link
           href="/signup"
-          className="text-accent hover:underline font-medium"
+          className="text-accent hover:underline font-semibold"
         >
-          Sign up
+          Create account
         </Link>
       </div>
     </div>
@@ -139,7 +139,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="max-w-md mx-auto px-4 py-16 sm:py-24">
-      <Suspense fallback={<div className="p-8 text-center text-xs text-ink-500">Loading sign in form...</div>}>
+      <Suspense fallback={<div className="p-8 text-center text-xs text-ink-500 font-mono">Loading authentication form...</div>}>
         <LoginForm />
       </Suspense>
     </main>

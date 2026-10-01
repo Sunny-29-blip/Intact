@@ -33,34 +33,34 @@ export function AppNav() {
     router.refresh();
   };
 
-  // Don't render full nav on standalone report pages
+  // Hide nav on standalone inspection report pages
   if (pathname.startsWith("/report/")) {
     return null;
   }
 
   return (
-    <header className="border-b border-ink-200 bg-paper-50 sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <Link
             href="/"
-            className="flex items-center space-x-2 text-ink-900 font-semibold tracking-tight text-lg"
+            className="flex items-center space-x-2.5 text-ink-900 font-bold tracking-tight text-base group"
           >
-            <span className="inline-block w-3 h-3 bg-accent rounded-xs"></span>
-            <span>INTACT</span>
-            <span className="text-xs font-mono uppercase px-1.5 py-0.5 border border-ink-200 rounded-xs text-ink-600">
-              Evidence Engine
+            <span className="w-2.5 h-2.5 bg-accent rounded-none inline-block"></span>
+            <span className="font-sans tracking-wide">INTACT</span>
+            <span className="text-[11px] font-mono font-normal text-ink-500 uppercase px-1.5 py-0.5 border border-ink-200">
+              Record
             </span>
           </Link>
 
           {user && (
-            <nav className="hidden sm:flex items-center space-x-4 text-sm font-medium">
+            <nav className="hidden sm:flex items-center space-x-1 text-xs font-medium">
               <Link
                 href="/properties"
-                className={`px-2.5 py-1.5 rounded transition-colors ${
+                className={`px-3 py-1.5 transition-colors border ${
                   pathname.startsWith("/properties")
-                    ? "bg-paper-200 text-ink-900 font-semibold"
-                    : "text-ink-600 hover:text-ink-900"
+                    ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                    : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
                 }`}
               >
                 Properties
@@ -69,32 +69,32 @@ export function AppNav() {
           )}
         </div>
 
-        <div className="flex items-center space-x-3 text-sm">
+        <div className="flex items-center space-x-3 text-xs">
           {loading ? (
-            <div className="w-16 h-4 bg-paper-200 animate-pulse rounded-xs" />
+            <div className="w-24 h-4 bg-page animate-pulse" />
           ) : user ? (
             <div className="flex items-center space-x-3">
-              <span className="hidden md:inline text-xs font-mono text-ink-600 px-2 py-1 bg-paper-100 border border-ink-100 rounded-xs">
+              <span className="hidden md:inline font-mono text-[11px] text-ink-600 px-2 py-0.5 bg-page border border-ink-200">
                 {user.email}
               </span>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 text-xs font-medium text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-white rounded transition-colors"
+                className="px-3 py-1.5 font-sans text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
               >
-                Sign Out
+                Log out
               </button>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <Link
                 href="/login"
-                className="px-3 py-1.5 text-xs font-medium text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 href="/signup"
-                className="px-3 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-hover rounded transition-colors"
+                className="px-3 py-1.5 text-xs text-white bg-accent hover:bg-accent-hover transition-colors font-medium"
               >
                 Sign Up
               </Link>

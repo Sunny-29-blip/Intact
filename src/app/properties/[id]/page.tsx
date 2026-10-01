@@ -27,6 +27,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [copiedShare, setCopiedShare] = useState(false);
 
   // Edit property state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -88,7 +89,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError("Failed to load property details.");
+        setError("Failed to load property record.");
       }
     } finally {
       setLoading(false);
@@ -99,7 +100,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     fetchPropertyAndComparisons();
   }, [propertyId]);
 
-  // Derived photo collections
   const moveInPhotos = useMemo(
     () => property?.inspections.move_in?.photos || [],
     [property]
@@ -109,14 +109,12 @@ export default function PropertyDetailPage({ params }: PageProps) {
     [property]
   );
 
-  // Unique areas defined in move-in
   const availableMoveInAreas = useMemo(() => {
     const set = new Set<string>();
     moveInPhotos.forEach((p) => set.add(p.area));
     return Array.from(set).sort();
   }, [moveInPhotos]);
 
-  // Grouped areas for comparison mapping
   const pairedAreas = useMemo(() => {
     const map = new Map<
       string,
@@ -138,7 +136,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     return Array.from(map.values());
   }, [moveInPhotos, moveOutPhotos]);
 
-  // Handle Edit Property Submit
   const handleEditProperty = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError(null);
@@ -169,7 +166,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  // Handle Delete Property
   const handleDeleteProperty = async () => {
     setDeleting(true);
     try {
@@ -182,7 +178,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  // Handle Move-In Photo Upload
   const handleMoveInUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setMoveInError(null);
@@ -224,7 +219,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  // Handle Move-Out Photo Upload
   const handleMoveOutUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setMoveOutError(null);
@@ -266,7 +260,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  // Handle Photo Deletion
   const handleDeletePhoto = async (photoId: string) => {
     if (!confirm("Are you sure you want to remove this inspection photo?")) {
       return;
@@ -283,7 +276,6 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  // Callback when a comparison is triggered or updated
   const handleComparisonUpdated = (updated: ComparisonWithFindings) => {
     setComparisons((prev) => {
       const existingIdx = prev.findIndex((c) => c.area === updated.area);
@@ -296,9 +288,17 @@ export default function PropertyDetailPage({ params }: PageProps) {
     });
   };
 
+  const copyShareLink = () => {
+    if (!property) return;
+    const shareUrl = `${window.location.origin}/report/${property.share_token}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2500);
+  };
+
   const formatSha = (sha?: string) => {
     if (!sha || sha.length < 12) return sha || "—";
-    return `${sha.slice(0, 6)}...${sha.slice(-6)}`;
+    return `${sha.slice(0, 8)}…${sha.slice(-6)}`;
   };
 
   const formatDate = (iso?: string) => {
@@ -319,32 +319,32 @@ export default function PropertyDetailPage({ params }: PageProps) {
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {/* Breadcrumb */}
-      <div className="flex items-center space-x-2 text-xs text-ink-500 mb-4">
+      <div className="flex items-center space-x-2 text-xs font-mono text-ink-500 mb-4">
         <Link href="/properties" className="hover:text-ink-900 underline">
-          Properties
+          PROPERTIES
         </Link>
         <span>/</span>
-        <span className="text-ink-900 font-medium truncate max-w-xs">
-          {property?.name || "Inspection Dossier"}
+        <span className="text-ink-900 font-semibold truncate max-w-xs">
+          {property?.name || "DOSSIER"}
         </span>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div className="bg-white border border-ink-200 rounded p-8 animate-pulse space-y-4">
-          <div className="h-6 bg-paper-200 rounded w-1/3"></div>
-          <div className="h-4 bg-paper-100 rounded w-1/2"></div>
-          <div className="h-32 bg-paper-50 rounded"></div>
+        <div className="border border-ink-200 bg-surface p-8 animate-pulse space-y-4">
+          <div className="h-5 bg-page w-1/3"></div>
+          <div className="h-4 bg-page w-1/2"></div>
+          <div className="h-32 bg-page"></div>
         </div>
       )}
 
       {/* Error state */}
       {error && (
-        <div className="p-4 bg-damage-bg border border-damage-border rounded text-xs text-damage mb-6 flex items-center justify-between">
+        <div className="p-4 bg-damage-bg border border-damage-border text-xs text-damage mb-6 flex items-center justify-between">
           <span>{error}</span>
           <button
             onClick={fetchPropertyAndComparisons}
-            className="underline font-medium hover:text-damage"
+            className="underline font-semibold hover:text-damage"
           >
             Retry
           </button>
@@ -354,117 +354,147 @@ export default function PropertyDetailPage({ params }: PageProps) {
       {/* Property Details Header */}
       {!loading && property && (
         <>
-          <div className="bg-white border border-ink-200 rounded p-6 sm:p-8 mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-ink-100 pb-5">
+          <div className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-ink-200 pb-5">
               <div>
-                <div className="text-xs font-mono uppercase text-ink-500 tracking-wider mb-1">
-                  Tenancy Condition Dossier
+                <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-1">
+                  TENANCY CONDITION DOSSIER
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight text-ink-900">
                   {property.name}
                 </h1>
                 {property.address && (
-                  <p className="text-sm text-ink-600 mt-1">{property.address}</p>
+                  <p className="text-xs text-ink-600 mt-1">{property.address}</p>
                 )}
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/report/${property.share_token}`}
+                  target="_blank"
+                  className="px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent-tint border border-accent-border transition-colors uppercase tracking-wider"
+                >
+                  View Inspection Report ↗
+                </Link>
+                <button
+                  onClick={copyShareLink}
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
+                >
+                  {copiedShare ? "✓ Link Copied" : "Copy Landlord Link"}
+                </button>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="px-3 py-1.5 text-xs font-medium text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-white rounded transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
                 >
-                  Edit Details
+                  Edit
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="px-3 py-1.5 text-xs font-medium text-damage hover:bg-damage-bg border border-damage-border rounded transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-damage hover:bg-damage-bg border border-damage-border transition-colors"
                 >
-                  Delete Record
+                  Delete
                 </button>
               </div>
             </div>
 
-            {/* Tenancy & Inspection Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5 text-xs">
+            {/* Tenancy & Inspection Metadata */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-5 text-xs">
               <div>
-                <span className="block font-mono text-ink-500 uppercase">Tenancy Period</span>
-                <span className="font-semibold text-ink-900 mt-0.5 block">
+                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                  Tenancy Period
+                </span>
+                <span className="font-semibold text-ink-900 mt-0.5 block font-mono text-[11px]">
                   {property.tenancy_start}
                   {property.tenancy_end ? ` → ${property.tenancy_end}` : " (Current)"}
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-ink-500 uppercase">Move-in Baseline</span>
-                <span className="font-semibold text-ink-900 mt-0.5 block">
-                  {moveInPhotos.length} photo{moveInPhotos.length === 1 ? "" : "s"} archived
+                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                  Record ID
+                </span>
+                <span
+                  title={property.id}
+                  className="font-mono text-[11px] text-ink-700 mt-0.5 block truncate"
+                >
+                  {property.id}
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-ink-500 uppercase">Move-out Paired</span>
+                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                  Move-In Baseline
+                </span>
                 <span className="font-semibold text-ink-900 mt-0.5 block">
-                  {moveOutPhotos.length} of {availableMoveInAreas.length} areas paired
+                  {moveInPhotos.length} {moveInPhotos.length === 1 ? "area photo" : "area photos"}
+                </span>
+              </div>
+              <div>
+                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                  Move-Out Paired
+                </span>
+                <span className="font-semibold text-ink-900 mt-0.5 block">
+                  {moveOutPhotos.length} of {availableMoveInAreas.length} areas
                 </span>
               </div>
             </div>
 
             {property.lease_notes && (
-              <div className="mt-4 pt-4 border-t border-ink-100 text-xs text-ink-700 bg-paper-50 p-3 rounded border border-ink-100">
-                <span className="font-semibold font-mono uppercase text-ink-500 mr-2">
-                  Lease Notes:
+              <div className="mt-4 pt-4 border-t border-ink-100 text-xs text-ink-700 bg-page p-3 border border-ink-200">
+                <span className="font-semibold font-mono uppercase text-ink-600 mr-2 text-[10px]">
+                  Lease Terms / Notes:
                 </span>
                 {property.lease_notes}
               </div>
             )}
           </div>
 
-          {/* Section 1: Move-In Baseline Upload & Catalog */}
-          <section className="bg-white border border-ink-200 rounded p-6 sm:p-8 mb-8">
-            <div className="border-b border-ink-100 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Section 1: Move-In Baseline Recording */}
+          <section className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">
+            <div className="border-b border-ink-200 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="text-xs font-mono uppercase text-ink-500">
-                  Stage 1: Baseline Recording
+                <div className="text-[10px] font-mono uppercase text-ink-500">
+                  STAGE 01: ARRIVAL RECORD
                 </div>
-                <h2 className="text-xl font-bold text-ink-900">
+                <h2 className="text-lg font-bold text-ink-900">
                   Move-In Baseline Photos
                 </h2>
               </div>
               <span className="text-xs font-mono text-ink-500">
-                {moveInPhotos.length} area photos
+                {moveInPhotos.length} areas documented
               </span>
             </div>
 
             {/* Move-in upload form */}
-            <div className="bg-paper-50 border border-ink-200 rounded p-4 sm:p-5 mb-6 text-xs">
-              <h3 className="font-semibold text-ink-900 mb-1">
-                Archive a Move-In Area Photo
+            <div className="bg-page border border-ink-200 p-4 sm:p-5 mb-6 text-xs">
+              <h3 className="font-bold text-ink-900 mb-1 uppercase font-mono text-[11px]">
+                Archive Move-In Baseline Photo
               </h3>
               <p className="text-ink-600 mb-4">
-                Enter an area label and upload a clear baseline photo.
+                Specify a descriptive area name (e.g. Master Bedroom — North Wall) and upload a high-resolution photo.
               </p>
 
               {moveInError && (
-                <div className="mb-4 p-3 bg-damage-bg border border-damage-border rounded text-damage">
+                <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-damage">
                   {moveInError}
                 </div>
               )}
 
               <form onSubmit={handleMoveInUpload} className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <div className="md:col-span-5">
-                  <label className="block font-medium text-ink-700 mb-1">
-                    Area Label <span className="text-damage">*</span>
+                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
+                    Area Description <span className="text-damage">*</span>
                   </label>
                   <input
                     type="text"
                     value={moveInArea}
                     onChange={(e) => setMoveInArea(e.target.value)}
-                    placeholder="e.g. Living Room — North Wall"
+                    placeholder="e.g. Living Room — East Wall"
                     disabled={moveInUploading}
-                    className="w-full px-3 py-2 border border-ink-200 rounded bg-white focus:outline-none focus:border-accent"
+                    className="w-full px-3 py-2 border border-ink-200 bg-surface focus:outline-none focus:border-accent"
                   />
                 </div>
 
                 <div className="md:col-span-4">
-                  <label className="block font-medium text-ink-700 mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
                     Baseline Photo <span className="text-damage">*</span>
                   </label>
                   <input
@@ -472,7 +502,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                     accept="image/*"
                     onChange={(e) => setMoveInFile(e.target.files?.[0] || null)}
                     disabled={moveInUploading}
-                    className="w-full text-xs text-ink-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-ink-200 file:bg-white file:text-xs file:font-medium hover:file:bg-paper-100"
+                    className="w-full text-xs text-ink-700 file:mr-2 file:py-1.5 file:px-3 file:border file:border-ink-200 file:bg-surface file:text-xs file:font-mono hover:file:bg-page"
                   />
                 </div>
 
@@ -480,27 +510,27 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   <button
                     type="submit"
                     disabled={moveInUploading || !moveInFile}
-                    className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white rounded font-medium transition-colors disabled:opacity-50"
+                    className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50"
                   >
-                    {moveInUploading ? (moveInStatusText || "Uploading...") : "+ Add Move-In Photo"}
+                    {moveInUploading ? (moveInStatusText || "Uploading...") : "+ Add Baseline Photo"}
                   </button>
                 </div>
               </form>
             </div>
 
-            {/* Move-in gallery */}
+            {/* Move-in photo gallery */}
             {moveInPhotos.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-ink-200 rounded text-xs text-ink-500">
-                No move-in photos archived yet. Establish baseline photos above.
+              <div className="text-center py-8 border border-dashed border-ink-200 text-xs text-ink-500 font-mono">
+                No move-in photos archived yet. Add arrival photos above to establish your condition baseline.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {moveInPhotos.map((photo) => (
                   <div
                     key={photo.id}
-                    className="border border-ink-200 rounded overflow-hidden bg-paper-50 flex flex-col"
+                    className="border border-ink-200 bg-page flex flex-col p-3"
                   >
-                    <div className="relative aspect-[4/3] bg-paper-200 flex items-center justify-center">
+                    <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden mb-2.5">
                       {photo.signed_url ? (
                         <img
                           src={photo.signed_url}
@@ -509,24 +539,24 @@ export default function PropertyDetailPage({ params }: PageProps) {
                           loading="lazy"
                         />
                       ) : (
-                        <span className="text-xs text-ink-500 font-mono">Image loading...</span>
+                        <span className="text-xs text-ink-400 font-mono">Image loading...</span>
                       )}
                     </div>
-                    <div className="p-3 flex-1 flex flex-col justify-between text-xs">
+                    <div className="flex-1 flex flex-col justify-between text-xs">
                       <div>
-                        <div className="font-semibold text-ink-900">{photo.area}</div>
+                        <div className="font-bold text-ink-900">{photo.area}</div>
                         <div className="font-mono text-[10px] text-ink-500 mt-1">
-                          Recorded: {formatDate(photo.created_at)}
+                          {formatDate(photo.created_at)}
                         </div>
                         <div className="font-mono text-[10px] text-ink-500 mt-0.5 truncate" title={photo.sha256}>
-                          SHA: {formatSha(photo.sha256)}
+                          sha256 {formatSha(photo.sha256)}
                         </div>
                       </div>
                       <div className="mt-3 pt-2 border-t border-ink-100 flex justify-end">
                         <button
                           onClick={() => handleDeletePhoto(photo.id)}
                           disabled={deletingPhotoId === photo.id}
-                          className="text-[11px] text-damage hover:underline"
+                          className="text-[10px] font-mono text-damage hover:underline"
                         >
                           {deletingPhotoId === photo.id ? "Deleting..." : "Delete Photo"}
                         </button>
@@ -538,54 +568,54 @@ export default function PropertyDetailPage({ params }: PageProps) {
             )}
           </section>
 
-          {/* Section 2: Move-Out Upload & Visual Difference Analysis */}
-          <section className="bg-white border border-ink-200 rounded p-6 sm:p-8">
-            <div className="border-b border-ink-100 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Section 2: Move-Out Departure Pairing & AI Difference Review */}
+          <section className="border border-ink-200 bg-surface p-6 sm:p-8">
+            <div className="border-b border-ink-200 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="text-xs font-mono uppercase text-ink-500">
-                  Stage 2: Departure Verification & AI Difference Analysis
+                <div className="text-[10px] font-mono uppercase text-ink-500">
+                  STAGE 02: DEPARTURE VERIFICATION & AI COMPARISON
                 </div>
-                <h2 className="text-xl font-bold text-ink-900">
+                <h2 className="text-lg font-bold text-ink-900">
                   Move-Out Pairing & Findings Review
                 </h2>
               </div>
               <span className="text-xs font-mono text-ink-500">
-                {moveOutPhotos.length} / {availableMoveInAreas.length} paired
+                {moveOutPhotos.length} of {availableMoveInAreas.length} areas paired
               </span>
             </div>
 
             {/* Move-out upload form */}
             {availableMoveInAreas.length === 0 ? (
-              <div className="p-4 bg-paper-100 border border-ink-200 rounded text-xs text-ink-600 mb-6">
-                <strong>Move-out photos require a baseline:</strong> Please upload move-in photos in the section above first.
+              <div className="p-4 bg-page border border-ink-200 text-xs text-ink-600 mb-6 font-mono">
+                [!] Move-out photos require a baseline: Please upload move-in photos above first.
               </div>
             ) : (
-              <div className="bg-paper-50 border border-ink-200 rounded p-4 sm:p-5 mb-8 text-xs">
-                <h3 className="font-semibold text-ink-900 mb-1">
+              <div className="bg-page border border-ink-200 p-4 sm:p-5 mb-8 text-xs">
+                <h3 className="font-bold text-ink-900 mb-1 uppercase font-mono text-[11px]">
                   Upload Matching Move-Out Photo
                 </h3>
                 <p className="text-ink-600 mb-4">
-                  Select an area that exists in your move-in baseline to pair with departure condition.
+                  Select an area from your baseline to pair with the departure photograph.
                 </p>
 
                 {moveOutError && (
-                  <div className="mb-4 p-3 bg-damage-bg border border-damage-border rounded text-damage">
+                  <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-damage">
                     {moveOutError}
                   </div>
                 )}
 
                 <form onSubmit={handleMoveOutUpload} className="grid grid-cols-1 md:grid-cols-12 gap-3">
                   <div className="md:col-span-5">
-                    <label className="block font-medium text-ink-700 mb-1">
-                      Target Area <span className="text-damage">*</span>
+                    <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
+                      Target Baseline Area <span className="text-damage">*</span>
                     </label>
                     <select
                       value={moveOutArea}
                       onChange={(e) => setMoveOutArea(e.target.value)}
                       disabled={moveOutUploading}
-                      className="w-full px-3 py-2 border border-ink-200 rounded bg-white focus:outline-none focus:border-accent"
+                      className="w-full px-3 py-2 border border-ink-200 bg-surface focus:outline-none focus:border-accent"
                     >
-                      <option value="">-- Choose Move-In Area --</option>
+                      <option value="">-- Select Move-In Area --</option>
                       {availableMoveInAreas.map((area) => (
                         <option key={area} value={area}>
                           {area}
@@ -595,7 +625,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   </div>
 
                   <div className="md:col-span-4">
-                    <label className="block font-medium text-ink-700 mb-1">
+                    <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
                       Departure Photo <span className="text-damage">*</span>
                     </label>
                     <input
@@ -603,7 +633,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                       accept="image/*"
                       onChange={(e) => setMoveOutFile(e.target.files?.[0] || null)}
                       disabled={moveOutUploading}
-                      className="w-full text-xs text-ink-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-ink-200 file:bg-white file:text-xs file:font-medium hover:file:bg-paper-100"
+                      className="w-full text-xs text-ink-700 file:mr-2 file:py-1.5 file:px-3 file:border file:border-ink-200 file:bg-surface file:text-xs file:font-mono hover:file:bg-page"
                     />
                   </div>
 
@@ -611,7 +641,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                     <button
                       type="submit"
                       disabled={moveOutUploading || !moveOutFile || !moveOutArea}
-                      className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white rounded font-medium transition-colors disabled:opacity-50"
+                      className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50"
                     >
                       {moveOutUploading ? (moveOutStatusText || "Uploading...") : "+ Pair Move-Out Photo"}
                     </button>
@@ -622,7 +652,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
 
             {/* List of Area Comparison Cards */}
             {pairedAreas.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-ink-200 rounded text-xs text-ink-500">
+              <div className="text-center py-8 border border-dashed border-ink-200 text-xs text-ink-500 font-mono">
                 No area photo pairs established yet.
               </div>
             ) : (
@@ -652,79 +682,79 @@ export default function PropertyDetailPage({ params }: PageProps) {
       {/* Edit Property Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white border border-ink-200 rounded max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="border-b border-ink-100 pb-3 mb-5 flex items-center justify-between">
+          <div className="bg-surface border border-ink-200 max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-ink-200 pb-3 mb-5 flex items-center justify-between">
               <div>
-                <div className="text-xs font-mono uppercase text-ink-500">Edit Record</div>
-                <h2 className="text-lg font-bold text-ink-900">Update Property Details</h2>
+                <div className="text-[10px] font-mono uppercase text-ink-500">EDIT RECORD</div>
+                <h2 className="text-base font-bold text-ink-900">Update Property Details</h2>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="text-ink-500 hover:text-ink-900"
+                className="text-ink-500 hover:text-ink-900 font-mono text-sm"
               >
-                ✕
+                [✕]
               </button>
             </div>
 
             {editError && (
-              <div className="mb-4 p-3 bg-damage-bg border border-damage-border rounded text-xs text-damage">
+              <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-xs text-damage">
                 {editError}
               </div>
             )}
 
             <form onSubmit={handleEditProperty} className="space-y-4 text-xs">
               <div>
-                <label className="block font-medium text-ink-700 mb-1">
+                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
                   Property Name <span className="text-damage">*</span>
                 </label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 border border-ink-200 rounded bg-paper-50 focus:bg-white focus:outline-none focus:border-accent"
+                  className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label className="block font-medium text-ink-700 mb-1">Address</label>
+                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">Address</label>
                 <input
                   type="text"
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full px-3 py-2 border border-ink-200 rounded bg-paper-50 focus:bg-white focus:outline-none focus:border-accent"
+                  className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-ink-700 mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
                     Tenancy Start <span className="text-damage">*</span>
                   </label>
                   <input
                     type="date"
                     value={editTenancyStart}
                     onChange={(e) => setEditTenancyStart(e.target.value)}
-                    className="w-full px-3 py-2 border border-ink-200 rounded bg-paper-50 focus:bg-white focus:outline-none focus:border-accent"
+                    className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block font-medium text-ink-700 mb-1">Tenancy End</label>
+                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">Tenancy End</label>
                   <input
                     type="date"
                     value={editTenancyEnd}
                     onChange={(e) => setEditTenancyEnd(e.target.value)}
-                    className="w-full px-3 py-2 border border-ink-200 rounded bg-paper-50 focus:bg-white focus:outline-none focus:border-accent"
+                    className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-medium text-ink-700 mb-1">Lease Notes</label>
+                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">Lease Notes</label>
                 <textarea
                   value={editLeaseNotes}
                   onChange={(e) => setEditLeaseNotes(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-ink-200 rounded bg-paper-50 focus:bg-white focus:outline-none focus:border-accent"
+                  className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -733,14 +763,14 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   type="button"
                   onClick={() => setShowEditModal(false)}
                   disabled={editSubmitting}
-                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-white text-ink-700 rounded transition-colors"
+                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editSubmitting}
-                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded font-medium transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
                 >
                   {editSubmitting ? "Saving..." : "Save Changes"}
                 </button>
@@ -753,12 +783,12 @@ export default function PropertyDetailPage({ params }: PageProps) {
       {/* Delete Property Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white border border-ink-200 rounded max-w-md w-full p-6 text-xs">
+          <div className="bg-surface border border-ink-200 max-w-md w-full p-6 text-xs">
             <h2 className="text-base font-bold text-ink-900 mb-2">
               Confirm Record Deletion
             </h2>
             <p className="text-ink-600 leading-relaxed mb-4">
-              Are you sure you want to permanently delete <strong>{property?.name}</strong>?
+              Permanently delete <strong>{property?.name}</strong>?
               This will remove all move-in and move-out photos from storage and destroy the entire inspection dossier.
             </p>
 
@@ -767,7 +797,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-white text-ink-700 rounded transition-colors"
+                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors"
               >
                 Cancel
               </button>
@@ -775,7 +805,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 type="button"
                 onClick={handleDeleteProperty}
                 disabled={deleting}
-                className="px-4 py-2 bg-damage hover:bg-damage text-white rounded font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-damage hover:bg-damage text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
               >
                 {deleting ? "Deleting Record..." : "Permanently Delete"}
               </button>

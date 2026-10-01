@@ -9,9 +9,10 @@ import { authSchema } from "@/lib/validation";
 export default function SignupPage() {
   const router = useRouter();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; general?: string }>({});
   const [loading, setLoading] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
@@ -35,6 +36,11 @@ export default function SignupPage() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          data: {
+            full_name: name.trim() || undefined,
+          },
+        },
       });
 
       if (error) {
@@ -43,13 +49,12 @@ export default function SignupPage() {
         return;
       }
 
-      // If user session is immediate (or auto-confirmed in Supabase)
       if (data.session) {
         router.push("/properties");
         router.refresh();
       } else {
         setSuccessNotice(
-          "Account created. If email verification is enabled, please verify your email or sign in below."
+          "Account created successfully. You can now sign in below."
         );
         setLoading(false);
       }
@@ -61,35 +66,49 @@ export default function SignupPage() {
 
   return (
     <main className="max-w-md mx-auto px-4 py-16 sm:py-24">
-      <div className="bg-white border border-ink-200 rounded p-6 sm:p-8">
-        <div className="border-b border-ink-100 pb-4 mb-6">
-          <div className="text-xs font-mono uppercase text-ink-500 tracking-wider">
-            Tenancy Evidence Record
+      <div className="bg-surface border border-ink-200 p-6 sm:p-8">
+        <div className="border-b border-ink-200 pb-4 mb-6">
+          <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+            TENANT REGISTRATION
           </div>
           <h1 className="text-xl font-bold tracking-tight text-ink-900 mt-1">
             Create an Account
           </h1>
-          <p className="text-sm text-ink-600 mt-1">
-            Start protecting your tenancy deposit with cryptographic evidence.
+          <p className="text-xs text-ink-600 mt-1">
+            Start documenting your rental room condition baseline.
           </p>
         </div>
 
         {errors.general && (
-          <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage rounded">
+          <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage">
             {errors.general}
           </div>
         )}
 
         {successNotice && (
-          <div className="mb-5 p-3 text-xs bg-accepted-bg border border-accepted-border text-accepted rounded">
+          <div className="mb-5 p-3 text-xs bg-accepted-bg border border-accepted-border text-accepted font-medium">
             {successNotice}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-ink-700 uppercase tracking-wider mb-1">
-              Email Address
+            <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
+              Full Name (Optional)
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Rahul Sharma"
+              disabled={loading}
+              className="w-full px-3 py-2 text-xs border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
+              Email Address <span className="text-damage">*</span>
             </label>
             <input
               type="email"
@@ -97,20 +116,20 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tenant@example.com"
               disabled={loading}
-              className={`w-full px-3 py-2 text-sm border rounded bg-paper-50 focus:bg-white focus:outline-none transition-colors ${
+              className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
                 errors.email
                   ? "border-damage focus:border-damage"
                   : "border-ink-200 focus:border-accent"
               }`}
             />
             {errors.email && (
-              <p className="text-xs text-damage mt-1">{errors.email}</p>
+              <p className="text-[11px] text-damage mt-1 font-mono">{errors.email}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-ink-700 uppercase tracking-wider mb-1">
-              Password (min 6 characters)
+            <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
+              Password (min 6 characters) <span className="text-damage">*</span>
             </label>
             <input
               type="password"
@@ -118,23 +137,23 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={loading}
-              className={`w-full px-3 py-2 text-sm border rounded bg-paper-50 focus:bg-white focus:outline-none transition-colors ${
+              className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
                 errors.password
                   ? "border-damage focus:border-damage"
                   : "border-ink-200 focus:border-accent"
               }`}
             />
             {errors.password && (
-              <p className="text-xs text-damage mt-1">{errors.password}</p>
+              <p className="text-[11px] text-damage mt-1 font-mono">{errors.password}</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-2.5 px-4 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded transition-colors disabled:opacity-50"
+            className="w-full mt-2 py-2.5 px-4 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
           >
-            {loading ? "Creating Account..." : "Create Account"}
+            {loading ? "Registering..." : "Create Tenant Account"}
           </button>
         </form>
 
@@ -142,7 +161,7 @@ export default function SignupPage() {
           Already have an account?{" "}
           <Link
             href="/login"
-            className="text-accent hover:underline font-medium"
+            className="text-accent hover:underline font-semibold"
           >
             Sign in
           </Link>
