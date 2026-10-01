@@ -36,6 +36,10 @@ export interface Photo {
   created_at: string;
 }
 
+export interface PhotoWithUrl extends Photo {
+  signed_url?: string;
+}
+
 export interface Comparison {
   id: string;
   user_id: string;
@@ -64,6 +68,33 @@ export interface Finding {
   decision: FindingDecision;
   decision_note: string | null;
   created_at: string;
+}
+
+export interface InspectionWithPhotos extends Inspection {
+  photos: PhotoWithUrl[];
+}
+
+export interface PropertyDetail extends Property {
+  inspections: {
+    move_in: InspectionWithPhotos | null;
+    move_out: InspectionWithPhotos | null;
+  };
+  move_in_count?: number;
+  move_out_count?: number;
+}
+
+export interface PropertyListItem extends Property {
+  move_in_count: number;
+  move_out_count: number;
+}
+
+export interface ApiResponse<T> {
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: Record<string, string[]>;
+  };
 }
 
 export interface Database {
