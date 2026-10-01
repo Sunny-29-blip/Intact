@@ -197,6 +197,7 @@ export interface ApiResponse<T> {
     code: string;
     message: string;
     details?: Record<string, string[]>;
+    ref?: string;
   };
 }
 

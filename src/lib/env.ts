@@ -7,6 +7,7 @@ const envSchema = z.object({
   SUPABASE_SECRET_KEY: z.string().min(1, "SUPABASE_SECRET_KEY is required"),
   GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
   GEMINI_MODEL: z.string().min(1, "GEMINI_MODEL is required").default("gemini-2.5-flash"),
+  GEMINI_FALLBACK_MODEL: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -17,6 +18,7 @@ const readRaw = (): Record<keyof Env, string | undefined> => ({
   SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  GEMINI_FALLBACK_MODEL: process.env.GEMINI_FALLBACK_MODEL || undefined,
 });
 
 /**

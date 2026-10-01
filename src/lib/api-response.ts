@@ -8,7 +8,8 @@ export function apiError(
   code: string,
   message: string,
   status = 400,
-  details?: Record<string, string[]>
+  details?: Record<string, string[]>,
+  ref?: string
 ) {
   return NextResponse.json(
     {
@@ -16,6 +17,7 @@ export function apiError(
         code,
         message,
         ...(details ? { details } : {}),
+        ...(ref ? { ref } : {}),
       },
     },
     { status }

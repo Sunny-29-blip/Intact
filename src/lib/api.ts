@@ -29,12 +29,14 @@ import type {
 class ApiError extends Error {
   code: string;
   details?: Record<string, string[]>;
+  ref?: string;
 
-  constructor(message: string, code = "API_ERROR", details?: Record<string, string[]>) {
+  constructor(message: string, code = "API_ERROR", details?: Record<string, string[]>, ref?: string) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.details = details;
+    this.ref = ref;
   }
 }
 
@@ -54,7 +56,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
       code: `HTTP_${response.status}`,
       message: response.statusText || "Request failed",
     };
-    throw new ApiError(error.message, error.code, error.details);
+    throw new ApiError(error.message, error.code, error.details, error.ref);
   }
 
   return result.data as T;
