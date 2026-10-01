@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { USE_SEMANTIC_COLORS_IN_LIST } from "@/lib/config";
 import type {
   Property,
   PhotoWithUrl,
@@ -292,6 +293,13 @@ export default function ReportPage({ params }: PageProps) {
   };
 
   const getClassificationBadge = (cls: string) => {
+    if (!USE_SEMANTIC_COLORS_IN_LIST) {
+      return (
+        <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-page text-ink-800 border border-ink-200">
+          {cls === "damage" ? "DAMAGE" : cls === "wear" ? "NORMAL WEAR" : "UNCLEAR"}
+        </span>
+      );
+    }
     switch (cls) {
       case "damage":
         return (
@@ -553,8 +561,30 @@ export default function ReportPage({ params }: PageProps) {
                               <img
                                 src={moveOutUrl}
                                 alt={`Move-out photo for ${comp.area}`}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover block"
                               />
+                              {comp.findings.map((f, fIdx) => {
+                                if (f.box_ymin === null || f.box_xmin === null || f.box_ymax === null || f.box_xmax === null) return null;
+                                const left = Math.max(4, Math.min(96, (f.box_xmin + f.box_xmax) / 20));
+                                const top = Math.max(4, Math.min(96, (f.box_ymin + f.box_ymax) / 20));
+                                const isUnclear = f.classification === "unclear";
+
+                                return (
+                                  <div
+                                    key={f.id}
+                                    style={{
+                                      top: `${top}%`,
+                                      left: `${left}%`,
+                                      transform: "translate(-50%, -50%)",
+                                    }}
+                                    className={`absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] ${
+                                      isUnclear ? "border-dashed" : "border-solid"
+                                    } border-[1.5px] border-[#0B3D4A] flex items-center justify-center font-mono text-[12px] font-medium shadow-none z-20`}
+                                  >
+                                    {fIdx + 1}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>

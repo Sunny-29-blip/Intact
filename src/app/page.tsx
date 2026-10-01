@@ -108,27 +108,6 @@ export default async function HomePage() {
                       alt="Bedroom, north wall — original condition"
                       className="w-full h-full object-cover"
                     />
-                    {/* Numbered Marker 01 */}
-                    <div
-                      style={{ top: "38%", left: "26%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-surface border-2 border-damage text-damage font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
-                    >
-                      01
-                    </div>
-                    {/* Numbered Marker 02 */}
-                    <div
-                      style={{ top: "79%", left: "48%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-surface border-2 border-wear text-wear font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
-                    >
-                      02
-                    </div>
-                    {/* Numbered Marker 03 */}
-                    <div
-                      style={{ top: "13%", left: "61%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-surface border-2 border-dashed border-unclear text-unclear font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
-                    >
-                      03
-                    </div>
                   </div>
                   <div className="mt-2 text-[10px] font-mono text-ink-500">
                     Bedroom, north wall — original condition
@@ -150,21 +129,21 @@ export default async function HomePage() {
                     {/* Numbered Marker 01 */}
                     <div
                       style={{ top: "38%", left: "26%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-damage text-white border-2 border-damage font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
+                      className="absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-[1.5px] border-[#0B3D4A] font-mono text-[12px] font-medium flex items-center justify-center shadow-none z-20"
                     >
                       01
                     </div>
                     {/* Numbered Marker 02 */}
                     <div
                       style={{ top: "79%", left: "48%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-wear text-white border-2 border-wear font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
+                      className="absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-[1.5px] border-[#0B3D4A] font-mono text-[12px] font-medium flex items-center justify-center shadow-none z-20"
                     >
                       02
                     </div>
-                    {/* Numbered Marker 03 */}
+                    {/* Numbered Marker 03 (Unclear) */}
                     <div
                       style={{ top: "13%", left: "61%", transform: "translate(-50%, -50%)" }}
-                      className="absolute w-[22px] h-[22px] bg-surface border-2 border-dashed border-unclear text-unclear font-mono text-[10px] font-bold flex items-center justify-center shadow-none z-20"
+                      className="absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-dashed border-[1.5px] border-[#0B3D4A] font-mono text-[12px] font-medium flex items-center justify-center shadow-none z-20"
                     >
                       03
                     </div>
@@ -261,18 +240,6 @@ export default async function HomePage() {
                   alt="Kitchen, counter & splashback — move-in"
                   className="w-full h-full object-cover"
                 />
-                <div
-                  style={{ top: "56%", left: "70%", transform: "translate(-50%, -50%)" }}
-                  className="absolute w-[22px] h-[22px] bg-surface border-2 border-damage text-damage font-mono text-[10px] font-bold flex items-center justify-center z-20"
-                >
-                  01
-                </div>
-                <div
-                  style={{ top: "24%", left: "36%", transform: "translate(-50%, -50%)" }}
-                  className="absolute w-[22px] h-[22px] bg-surface border-2 border-wear text-wear font-mono text-[10px] font-bold flex items-center justify-center z-20"
-                >
-                  02
-                </div>
               </div>
               <div className="mt-2 text-[10px] font-mono text-ink-500">
                 Kitchen, counter & splashback
@@ -293,13 +260,13 @@ export default async function HomePage() {
                 />
                 <div
                   style={{ top: "62%", left: "70%", transform: "translate(-50%, -50%)" }}
-                  className="absolute w-[22px] h-[22px] bg-damage text-white border-2 border-damage font-mono text-[10px] font-bold flex items-center justify-center z-20"
+                  className="absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-[1.5px] border-[#0B3D4A] font-mono text-[12px] font-medium flex items-center justify-center shadow-none z-20"
                 >
                   01
                 </div>
                 <div
                   style={{ top: "20%", left: "36%", transform: "translate(-50%, -50%)" }}
-                  className="absolute w-[22px] h-[22px] bg-wear text-white border-2 border-wear font-mono text-[10px] font-bold flex items-center justify-center z-20"
+                  className="absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-[1.5px] border-[#0B3D4A] font-mono text-[12px] font-medium flex items-center justify-center shadow-none z-20"
                 >
                   02
                 </div>

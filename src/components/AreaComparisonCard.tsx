@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { api, ApiError } from "@/lib/api";
-import { SHOW_REGION_HINT_ON_SELECT } from "@/lib/config";
+import { USE_SEMANTIC_COLORS_IN_LIST } from "@/lib/config";
 import type {
   PhotoWithUrl,
   ComparisonWithFindings,
@@ -218,19 +218,28 @@ export function AreaComparisonCard({
     }
   };
 
+  const getClassificationColor = (cls: string) => {
+    if (!USE_SEMANTIC_COLORS_IN_LIST) return "text-ink-700";
+    switch (cls) {
+      case "damage":
+        return "text-damage font-bold";
+      case "wear":
+        return "text-wear font-bold";
+      default:
+        return "text-unclear font-bold";
+    }
+  };
+
   const getMarkerStyle = (f: Finding, isLit: boolean) => {
-    const isDamage = f.classification === "damage";
-    const isWear = f.classification === "wear";
+    const isUnclear = f.classification === "unclear";
 
     if (isLit) {
-      if (isDamage) return "bg-damage text-white border-2 border-damage";
-      if (isWear) return "bg-wear text-white border-2 border-wear";
-      return "bg-unclear text-white border-2 border-dashed border-unclear";
+      return "bg-[#0B3D4A] text-white ring-2 ring-white border-[1.5px] border-[#0B3D4A]";
     }
 
-    if (isDamage) return "bg-surface text-damage border-2 border-damage";
-    if (isWear) return "bg-surface text-wear border-2 border-wear";
-    return "bg-surface text-unclear border-2 border-dashed border-unclear";
+    return isUnclear
+      ? "bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-dashed border-[1.5px] border-[#0B3D4A]"
+      : "bg-[rgba(255,255,255,0.92)] text-[#0B3D4A] border-solid border-[1.5px] border-[#0B3D4A]";
   };
 
   return (
@@ -433,25 +442,6 @@ export function AreaComparisonCard({
                   loading="lazy"
                 />
 
-                {/* Optional Faint Region Hint on explicit selection */}
-                {SHOW_REGION_HINT_ON_SELECT &&
-                  isComplete &&
-                  markers.map((m) => {
-                    if (!m.hasBox || !m.box || selectedFindingId !== m.id) return null;
-                    return (
-                      <div
-                        key={`hint-${m.id}`}
-                        style={{
-                          top: `${m.box.top}%`,
-                          left: `${m.box.left}%`,
-                          width: `${m.box.width}%`,
-                          height: `${m.box.height}%`,
-                        }}
-                        className="absolute border border-dashed border-ink-700/45 pointer-events-none transition-opacity duration-300 z-10"
-                      />
-                    );
-                  })}
-
                 {/* Numbered Square Finding Markers */}
                 {isComplete &&
                   markers.map((m) => {
@@ -473,9 +463,9 @@ export function AreaComparisonCard({
                         style={{
                           top: `${m.top}%`,
                           left: `${m.left}%`,
-                          transform: `translate(-50%, -50%) ${isLit ? "scale(1.08)" : "scale(1)"}`,
+                          transform: "translate(-50%, -50%)",
                         }}
-                        className={`absolute w-[24px] h-[24px] sm:w-[22px] sm:h-[22px] rounded-none flex items-center justify-center font-mono text-[11px] sm:text-[10px] font-bold shadow-none transition-transform duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent after:absolute after:-inset-2.5 after:content-[''] ${
+                        className={`absolute w-[28px] h-[28px] sm:w-[26px] sm:h-[26px] rounded-[4px] flex items-center justify-center font-mono text-[12px] font-medium shadow-none transition-all duration-250 ease-out cursor-pointer focus:outline-none after:absolute after:-inset-[8px] sm:after:-inset-[9px] after:content-[''] ${
                           isLit ? "z-30" : "z-20"
                         } ${getMarkerStyle(m.finding, isLit)}`}
                       >
@@ -584,7 +574,7 @@ export function AreaComparisonCard({
                     }}
                     className={`border p-4 transition-all text-xs cursor-pointer interactive-row lit ${
                       isSelected
-                        ? "border-ink-900 bg-surface ring-1 ring-ink-900"
+                        ? "border-accent bg-accent-tint ring-1 ring-accent"
                         : isHovered
                         ? "border-ink-400 bg-surface"
                         : "border-ink-200 bg-surface"
@@ -595,11 +585,7 @@ export function AreaComparisonCard({
                         <span
                           className={`w-[22px] h-[22px] flex items-center justify-center font-mono text-[10px] font-bold flex-shrink-0 mt-0.5 ${
                             isSelected || isHovered
-                              ? finding.classification === "damage"
-                                ? "bg-damage text-white"
-                                : finding.classification === "wear"
-                                ? "bg-wear text-white"
-                                : "bg-unclear text-white"
+                              ? "bg-accent text-white"
                               : "bg-ink-900 text-white"
                           }`}
                         >
@@ -610,10 +596,13 @@ export function AreaComparisonCard({
                             {finding.description}
                           </p>
 
-                          {/* Formatted metadata mono line (Phase 4 requirement) */}
-                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="font-mono text-[11px] text-ink-700 uppercase font-semibold">
-                              {getClassificationLabel(finding.classification)} · {finding.severity} severity · {Math.round(finding.confidence * 100)}% confidence
+                          {/* Formatted metadata mono line */}
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5 font-mono text-[11px]">
+                            <span className={getClassificationColor(finding.classification)}>
+                              {getClassificationLabel(finding.classification)}
+                            </span>
+                            <span className="text-ink-500 uppercase">
+                              · {finding.severity} severity · {Math.round(finding.confidence * 100)}% confidence
                             </span>
                             {hasNoBox && (
                               <span className="font-mono text-[10px] text-ink-500 bg-page px-1.5 py-0.5 border border-ink-200">

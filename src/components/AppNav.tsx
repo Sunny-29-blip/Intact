@@ -100,16 +100,16 @@ export function AppNav() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2.5">
               <Link
                 href="/login"
-                className="px-3.5 py-2 uppercase tracking-wider text-[11px] text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
+                className="h-11 sm:h-10 min-h-[44px] sm:min-h-[40px] px-4 py-2 inline-flex items-center justify-center rounded-[6px] font-sans font-medium text-[14px] text-[#373B41] bg-transparent border border-[#D1D5DB] hover:bg-white hover:border-[#9CA3AF] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3D4A]"
               >
-                Log In
+                Log in
               </Link>
               <Link
                 href="/signup"
-                className="px-4 py-2 uppercase tracking-wider text-[11px] text-white bg-accent hover:bg-accent-hover transition-colors font-semibold btn-motion lit-dark"
+                className="h-11 sm:h-10 min-h-[44px] sm:min-h-[40px] px-4 py-2 inline-flex items-center justify-center rounded-[6px] font-sans font-medium text-[14px] text-[#0B3D4A] bg-[#E0F0F3] border border-[rgba(11,61,74,0.22)] hover:bg-[color-mix(in_srgb,#0B3D4A_12%,white)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3D4A]"
               >
                 Start a record
               </Link>
