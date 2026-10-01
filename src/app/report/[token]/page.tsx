@@ -423,17 +423,17 @@ export default function ReportPage({ params }: PageProps) {
                             <div className="font-mono text-[10px] font-bold">
                               {f.decision === "accepted" && (
                                 <span className="px-1.5 py-0.5 bg-accepted-bg text-accepted border border-accepted-border">
-                                  ACCEPTED
+                                  ✓ ACCEPTED
                                 </span>
                               )}
                               {f.decision === "disputed" && (
                                 <span className="px-1.5 py-0.5 bg-disputed-bg text-disputed border border-disputed-border">
-                                  DISPUTED
+                                  ⚠ DISPUTED
                                 </span>
                               )}
                               {f.decision === "pending" && (
                                 <span className="px-1.5 py-0.5 bg-page text-ink-500 border border-ink-200">
-                                  UNREVIEWED
+                                  NOT REVIEWED
                                 </span>
                               )}
                             </div>

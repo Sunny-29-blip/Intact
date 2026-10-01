@@ -14,11 +14,11 @@ export default async function HomePage() {
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-      {/* Hero Section */}
+      {/* Hero Section with staggered entrance */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start border-b border-ink-200 pb-12 mb-12">
         {/* Left Column: Copy & Actions */}
-        <div className="lg:col-span-6 flex flex-col justify-center">
-          <div className="inline-flex items-center space-x-2 text-[11px] font-mono uppercase text-ink-500 tracking-wider mb-4 border border-ink-200 px-2 py-1 bg-surface self-start">
+        <div className="lg:col-span-6 flex flex-col justify-center animate-reveal-up">
+          <div className="inline-flex items-center space-x-2 text-[11px] font-mono uppercase text-ink-500 tracking-wider mb-4 border border-ink-200 px-2 py-1 bg-surface self-start lit">
             <span className="w-2 h-2 bg-accent inline-block"></span>
             <span>FOR TENANTS IN RENTED HOMES, HOSTELS AND PGS</span>
           </div>
@@ -38,13 +38,13 @@ export default async function HomePage() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/signup"
-              className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+              className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark"
             >
               Start a move-in record
             </Link>
             <Link
               href="/report/sample"
-              className="px-5 py-2.5 bg-surface border border-ink-200 hover:border-ink-400 text-ink-900 text-xs font-semibold uppercase tracking-wider transition-colors"
+              className="px-5 py-2.5 bg-surface border border-ink-200 hover:border-ink-400 text-ink-900 text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit"
             >
               See a sample report
             </Link>
@@ -53,22 +53,22 @@ export default async function HomePage() {
           <div className="mt-8 pt-6 border-t border-ink-200 grid grid-cols-2 gap-4 text-xs font-mono text-ink-500">
             <div>
               <span className="block text-ink-900 font-bold text-sm">SHA-256</span>
-              <span>Integrity verification per photo</span>
+              <span>File hash recorded for every photo</span>
             </div>
             <div>
-              <span className="block text-ink-900 font-bold text-sm">3 Categories</span>
-              <span>Damage, Normal Wear, Unclear</span>
+              <span className="block text-ink-900 font-bold text-sm">Separated</span>
+              <span>Normal wear is listed separately from damage</span>
             </div>
           </div>
         </div>
 
         {/* Right Column: Visual Inspection Example */}
-        <div className="lg:col-span-6">
+        <div className="lg:col-span-6 animate-reveal-up" style={{ animationDelay: "120ms" }}>
           <div className="border border-ink-200 bg-surface p-4 sm:p-5">
             <div className="flex items-center justify-between border-b border-ink-200 pb-3 mb-3">
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-mono font-bold text-ink-900">
-                  AREA SPECIMEN: BEDROOM — SOUTH WALL
+                  SAMPLE: BEDROOM — SOUTH WALL
                 </span>
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 bg-accent-tint text-accent border border-accent-border">
@@ -79,7 +79,7 @@ export default async function HomePage() {
             {/* Side-by-side demonstration mockup */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {/* Move-In Baseline Mock */}
-              <div className="border border-ink-200 bg-page p-2 flex flex-col">
+              <div className="border border-ink-200 bg-page p-2 flex flex-col photo-frame lit">
                 <div className="text-[10px] font-mono font-semibold text-ink-700 mb-1.5 flex justify-between">
                   <span>MOVE-IN BASELINE</span>
                   <span className="text-ink-500">IMG 01</span>
@@ -109,13 +109,13 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              {/* Move-Out Departure Mock with Bounding Boxes */}
-              <div className="border border-ink-200 bg-page p-2 flex flex-col">
+              {/* Move-Out Departure Mock with Numbered Markers (Phase 4) */}
+              <div className="border border-ink-200 bg-page p-2 flex flex-col photo-frame lit">
                 <div className="text-[10px] font-mono font-semibold text-ink-700 mb-1.5 flex justify-between">
                   <span>MOVE-OUT DEPARTURE</span>
                   <span className="text-accent font-bold">COMPARED</span>
                 </div>
-                {/* SVG Visual Departure with Bounding Boxes */}
+                {/* SVG Visual Departure with clean numbered markers */}
                 <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative overflow-hidden flex items-center justify-center">
                   <svg
                     viewBox="0 0 200 150"
@@ -132,29 +132,25 @@ export default async function HomePage() {
                     <rect x="40" y="60" width="20" height="30" fill="#FFFFFF" stroke="#9CA3AF" />
                     <rect x="47" y="70" width="6" height="10" fill="#D1D5DB" />
                     {/* Mark 1: Wall gouge */}
-                    <ellipse cx="130" cy="45" rx="10" ry="7" fill="#A63D3D" fillOpacity="0.8" />
+                    <ellipse cx="130" cy="45" rx="8" ry="5" fill="#A63D3D" fillOpacity="0.85" />
                     {/* Mark 2: Baseboard scuff */}
-                    <line x1="90" y1="120" x2="140" y2="124" stroke="#8A6A1A" strokeWidth="3" strokeDasharray="2,2" />
+                    <line x1="90" y1="120" x2="140" y2="124" stroke="#8A6A1A" strokeWidth="2.5" strokeDasharray="2,2" />
                   </svg>
 
-                  {/* Finding Box 1: Damage */}
+                  {/* Marker 1: Damage at (130, 45) -> (65%, 30%) */}
                   <div
-                    style={{ top: "20%", left: "55%", width: "24%", height: "24%" }}
-                    className="absolute border-2 border-damage bg-damage/15 pointer-events-none"
+                    style={{ top: "30%", left: "65%", transform: "translate(-50%, -50%)" }}
+                    className="absolute w-[22px] h-[22px] bg-surface border-2 border-damage text-damage font-mono text-[10px] font-bold flex items-center justify-center pointer-events-none"
                   >
-                    <span className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-none bg-damage text-white font-mono text-[9px] font-bold flex items-center justify-center">
-                      1
-                    </span>
+                    1
                   </div>
 
-                  {/* Finding Box 2: Normal Wear */}
+                  {/* Marker 2: Normal Wear at (115, 122) -> (58%, 81%) */}
                   <div
-                    style={{ top: "72%", left: "40%", width: "35%", height: "18%" }}
-                    className="absolute border-2 border-wear bg-wear/15 pointer-events-none"
+                    style={{ top: "81%", left: "58%", transform: "translate(-50%, -50%)" }}
+                    className="absolute w-[22px] h-[22px] bg-surface border-2 border-wear text-wear font-mono text-[10px] font-bold flex items-center justify-center pointer-events-none"
                   >
-                    <span className="absolute -top-2.5 -left-2.5 w-4 h-4 rounded-none bg-wear text-white font-mono text-[9px] font-bold flex items-center justify-center">
-                      2
-                    </span>
+                    2
                   </div>
                 </div>
                 <div className="mt-2 text-[9px] font-mono text-ink-500 leading-tight">
@@ -166,9 +162,9 @@ export default async function HomePage() {
 
             {/* Findings breakdown list */}
             <div className="space-y-2 border-t border-ink-200 pt-3">
-              <div className="border border-ink-200 bg-surface p-2 text-xs flex items-start justify-between gap-2">
+              <div className="border border-ink-200 bg-surface p-2 text-xs flex items-start justify-between gap-2 interactive-row lit">
                 <div className="flex items-start space-x-2">
-                  <span className="w-4 h-4 bg-damage text-white font-mono text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="w-[22px] h-[22px] bg-damage text-white font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                     1
                   </span>
                   <div>
@@ -181,13 +177,13 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 bg-accepted-bg text-accepted border border-accepted-border">
-                  ACCEPTED
+                  ✓ ACCEPTED
                 </span>
               </div>
 
-              <div className="border border-ink-200 bg-surface p-2 text-xs flex items-start justify-between gap-2">
+              <div className="border border-ink-200 bg-surface p-2 text-xs flex items-start justify-between gap-2 interactive-row lit">
                 <div className="flex items-start space-x-2">
-                  <span className="w-4 h-4 bg-wear text-white font-mono text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="w-[22px] h-[22px] bg-wear text-white font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                     2
                   </span>
                   <div>
@@ -200,7 +196,7 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 bg-accepted-bg text-accepted border border-accepted-border">
-                  ACCEPTED
+                  ✓ ACCEPTED
                 </span>
               </div>
             </div>
@@ -209,7 +205,7 @@ export default async function HomePage() {
       </section>
 
       {/* Numbered Documented Workflow Section */}
-      <section className="mb-16">
+      <section className="mb-16 animate-reveal-up" style={{ animationDelay: "240ms" }}>
         <div className="border-b border-ink-200 pb-3 mb-8">
           <div className="text-[11px] font-mono uppercase text-ink-500 tracking-wider">
             SYSTEM PROCEDURE
@@ -220,18 +216,17 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="border-l-2 border-ink-200 pl-4 py-1">
+          <div className="border-l-2 border-ink-200 pl-4 py-1 lit">
             <span className="font-mono text-xs text-accent font-bold">01</span>
             <h3 className="font-bold text-ink-900 text-sm mt-1 uppercase tracking-wide">
               Record Move-In
             </h3>
             <p className="text-xs text-ink-600 mt-2 leading-relaxed">
-              Photograph each room upon arrival. Photos are SHA-256 hashed and
-              safely archived in encrypted private storage.
+              Each photo&apos;s file hash is recorded and the photo is kept in private storage.
             </p>
           </div>
 
-          <div className="border-l-2 border-ink-200 pl-4 py-1">
+          <div className="border-l-2 border-ink-200 pl-4 py-1 lit">
             <span className="font-mono text-xs text-accent font-bold">02</span>
             <h3 className="font-bold text-ink-900 text-sm mt-1 uppercase tracking-wide">
               Record Move-Out
@@ -242,18 +237,17 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="border-l-2 border-ink-200 pl-4 py-1">
+          <div className="border-l-2 border-ink-200 pl-4 py-1 lit">
             <span className="font-mono text-xs text-accent font-bold">03</span>
             <h3 className="font-bold text-ink-900 text-sm mt-1 uppercase tracking-wide">
               Compare
             </h3>
             <p className="text-xs text-ink-600 mt-2 leading-relaxed">
-              Visual differences are identified and classified into DAMAGE,
-              NORMAL WEAR, or UNCLEAR conditioned on tenancy duration.
+              Differences are listed and labelled Damage, Normal wear or Unclear, taking the length of the tenancy into account.
             </p>
           </div>
 
-          <div className="border-l-2 border-ink-200 pl-4 py-1">
+          <div className="border-l-2 border-ink-200 pl-4 py-1 lit">
             <span className="font-mono text-xs text-accent font-bold">04</span>
             <h3 className="font-bold text-ink-900 text-sm mt-1 uppercase tracking-wide">
               Review + Share
@@ -267,7 +261,7 @@ export default async function HomePage() {
       </section>
 
       {/* Trust & Boundary Notice */}
-      <section className="border border-ink-200 bg-surface p-6 sm:p-8 text-xs text-ink-600 leading-relaxed">
+      <section className="border border-ink-200 bg-surface p-6 sm:p-8 text-xs text-ink-600 leading-relaxed animate-reveal-up" style={{ animationDelay: "360ms" }}>
         <div className="font-mono text-[10px] uppercase font-bold text-ink-500 mb-2">
           OPERATIONAL BOUNDARIES & INTEGRITY NOTICE
         </div>
