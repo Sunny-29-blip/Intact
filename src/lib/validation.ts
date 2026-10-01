@@ -65,20 +65,36 @@ export const updateLinkShareSchema = z.object({
 export type UpdateLinkShareInput = z.infer<typeof updateLinkShareSchema>;
 
 /**
+/**
+ * Validation schema for issue types in findings.
+ */
+export const issueTypeSchema = z.enum(
+  ["scratch", "crack", "stain", "hole", "missing_item", "mark", "other"],
+  {
+    errorMap: () => ({ message: "Invalid issue type" }),
+  }
+);
+
+export type IssueTypeInput = z.infer<typeof issueTypeSchema>;
+
+/**
  * Validation schema for creating a new tenant property.
  */
 export const createPropertySchema = z
   .object({
-    tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long"),
+    tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long").optional().nullable(),
     name: z.string().trim().min(1, "Flat or house name is required").max(255, "Name is too long"),
-    address: z.string().trim().min(1, "Address is required").max(500, "Address is too long"),
+    address: z.string().trim().min(1, "Address is required").max(500, "Address is too long").optional().nullable(),
     tenancy_start: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Contract start date must be a valid date (YYYY-MM-DD)"),
     tenancy_end: z
       .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Contract valid until date must be a valid date (YYYY-MM-DD)"),
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Contract valid until date must be a valid date (YYYY-MM-DD)")
+      .optional()
+      .nullable(),
     lease_notes: z.string().max(2000, "Lease notes are too long").optional().nullable(),
+    is_quick_check: z.boolean().optional(),
   })
   .refine(
     (data) => !data.tenancy_end || !data.tenancy_start || data.tenancy_end > data.tenancy_start,
@@ -94,9 +110,9 @@ export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
  * Validation schema for updating an existing tenant property.
  */
 export const updatePropertySchema = z.object({
-  tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long").optional(),
+  tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long").optional().nullable(),
   name: z.string().trim().min(1, "Flat or house name is required").max(255, "Name is too long").optional(),
-  address: z.string().trim().min(1, "Address is required").max(500, "Address is too long").optional(),
+  address: z.string().trim().min(1, "Address is required").max(500, "Address is too long").optional().nullable(),
   tenancy_start: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Tenancy start must be a valid date (YYYY-MM-DD)")
@@ -107,6 +123,7 @@ export const updatePropertySchema = z.object({
     .optional()
     .nullable(),
   lease_notes: z.string().max(2000, "Lease notes are too long").optional().nullable(),
+  is_quick_check: z.boolean().optional(),
 });
 
 export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;

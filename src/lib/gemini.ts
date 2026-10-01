@@ -22,6 +22,7 @@ export interface ComparePhotosParams {
   tenancyStart: string;
   tenancyEnd?: string | null;
   leaseNotes?: string | null;
+  isQuickCheck?: boolean;
   timeoutMs?: number;
 }
 
@@ -40,6 +41,7 @@ export async function comparePhotosWithGemini(
     tenancyStart: params.tenancyStart,
     tenancyEnd: params.tenancyEnd,
     leaseNotes: params.leaseNotes,
+    isQuickCheck: params.isQuickCheck,
   });
 
   const runCall = async (): Promise<GeminiComparisonResponse> => {

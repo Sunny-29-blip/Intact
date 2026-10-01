@@ -86,25 +86,17 @@ export function AppNav() {
                   : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
               }`}
             >
-              {role === "owner" ? "Owner Register" : "Register"}
+              {role === "owner" ? "Properties" : "Properties"}
             </Link>
-            {role !== "owner" && (
-              <Link
-                href="/properties"
-                className="px-3 py-1.5 transition-colors border border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100 lit"
-              >
-                Comparison
-              </Link>
-            )}
             <Link
-              href="/report/sample"
+              href="/report"
               className={`px-3 py-1.5 transition-colors border lit ${
-                pathname.startsWith("/report")
+                pathname === "/report"
                   ? "bg-page border-ink-200 text-ink-900 font-semibold"
                   : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
               }`}
             >
-              Sample Report
+              Report
             </Link>
             {user && (
               <Link

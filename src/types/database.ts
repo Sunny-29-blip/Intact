@@ -4,6 +4,14 @@ export type ComparisonStatus = "pending" | "complete" | "failed";
 export type FindingClassification = "damage" | "wear" | "unclear";
 export type FindingSeverity = "minor" | "moderate" | "major";
 export type FindingDecision = "pending" | "accepted" | "disputed";
+export type IssueType =
+  | "scratch"
+  | "crack"
+  | "stain"
+  | "hole"
+  | "missing_item"
+  | "mark"
+  | "other";
 export type DocumentKind = "property_evidence" | "tenancy_contract";
 
 export interface Document {
@@ -87,6 +95,7 @@ export interface Property {
   tenancy_end: string | null;
   lease_notes: string | null;
   share_token: string;
+  is_quick_check?: boolean;
   created_at: string;
   documents_missing?: boolean;
   contract?: Document | null;
@@ -135,6 +144,7 @@ export interface Finding {
   description: string;
   classification: FindingClassification;
   severity: FindingSeverity;
+  issue_type?: IssueType | null;
   confidence: number;
   box_ymin: number | null;
   box_xmin: number | null;

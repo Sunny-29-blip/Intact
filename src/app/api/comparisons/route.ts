@@ -32,10 +32,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get("propertyId");
 
-    if (!propertyId) {
-      return apiError("INVALID_QUERY", "propertyId query parameter is required", 400);
-    }
-
     const supabase = await createClient();
     const {
       data: { user },
@@ -46,25 +42,29 @@ export async function GET(request: NextRequest) {
       return apiError("UNAUTHORIZED", "Authentication required", 401);
     }
 
-    // Verify property ownership
-    const { data: property, error: propError } = await supabase
-      .from("properties")
-      .select("id")
-      .eq("id", propertyId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (propError || !property) {
-      return apiError("NOT_FOUND", "Property not found or unauthorized", 404);
-    }
-
-    // Fetch all comparisons for this property
-    const { data: comparisons, error: compError } = await supabase
+    let query = supabase
       .from("comparisons")
       .select("*")
-      .eq("property_id", propertyId)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
+      .eq("user_id", user.id);
+
+    if (propertyId) {
+      // Verify property ownership
+      const { data: property, error: propError } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("id", propertyId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (propError || !property) {
+        return apiError("NOT_FOUND", "Property not found or unauthorized", 404);
+      }
+      query = query.eq("property_id", propertyId).order("created_at", { ascending: true });
+    } else {
+      query = query.order("created_at", { ascending: false }).limit(30);
+    }
+
+    const { data: comparisons, error: compError } = await query;
 
     if (compError) {
       console.error("[GET /api/comparisons] DB error:", compError);
@@ -76,17 +76,49 @@ export async function GET(request: NextRequest) {
     }
 
     const comparisonIds = comparisons.map((c) => c.id);
+    const photoIds = Array.from(
+      new Set(
+        comparisons
+          .flatMap((c) => [c.move_in_photo_id, c.move_out_photo_id])
+          .filter((id): id is string => Boolean(id))
+      )
+    );
 
     // Fetch findings for all comparisons
-    const { data: findings, error: findingsError } = await supabase
-      .from("findings")
-      .select("*")
-      .in("comparison_id", comparisonIds)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
+    const [{ data: findings, error: findingsError }, { data: photos }] = await Promise.all([
+      supabase
+        .from("findings")
+        .select("*")
+        .in("comparison_id", comparisonIds)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+      photoIds.length > 0
+        ? supabase
+            .from("photos")
+            .select("*")
+            .in("id", photoIds)
+            .eq("user_id", user.id)
+        : Promise.resolve({ data: [] }),
+    ]);
 
     if (findingsError) {
       console.error("[GET /api/comparisons] Findings error:", findingsError);
+    }
+
+    // Generate signed URLs for photos
+    const photosMap = new Map<string, PhotoWithUrl>();
+    if (photos && photos.length > 0) {
+      await Promise.all(
+        photos.map(async (p) => {
+          const { data: signData } = await supabase.storage
+            .from("inspection-photos")
+            .createSignedUrl(p.storage_path, 3600);
+          photosMap.set(p.id, {
+            ...p,
+            signed_url: signData?.signedUrl || undefined,
+          });
+        })
+      );
     }
 
     // Group findings by comparison_id
@@ -100,6 +132,8 @@ export async function GET(request: NextRequest) {
     const result: ComparisonWithFindings[] = comparisons.map((c) => ({
       ...c,
       findings: findingsMap.get(c.id) || [],
+      move_in_photo: c.move_in_photo_id ? photosMap.get(c.move_in_photo_id) || null : null,
+      move_out_photo: c.move_out_photo_id ? photosMap.get(c.move_out_photo_id) || null : null,
     }));
 
     return apiSuccess(result);
@@ -304,6 +338,7 @@ export async function POST(request: NextRequest) {
         tenancyStart: property.tenancy_start,
         tenancyEnd: property.tenancy_end,
         leaseNotes: property.lease_notes,
+        isQuickCheck: Boolean(property.is_quick_check),
         timeoutMs: 45000,
       });
     } catch (aiErr) {
@@ -353,6 +388,7 @@ export async function POST(request: NextRequest) {
         description: f.description,
         classification: f.classification,
         severity: f.severity,
+        issue_type: f.issue_type || "other",
         confidence: Number(f.confidence.toFixed(2)),
         box_ymin,
         box_xmin,

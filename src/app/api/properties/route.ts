@@ -4,8 +4,11 @@ import { apiError, apiSuccess } from "@/lib/api-response";
 import { createPropertySchema } from "@/lib/validation";
 import type { PropertyListItem } from "@/types/database";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const includeQuickCheck = searchParams.get("includeQuickCheck") === "true";
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -17,11 +20,17 @@ export async function GET() {
     }
 
     // Fetch user's properties
-    const { data: properties, error: propertiesError } = await supabase
+    let query = supabase
       .from("properties")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
+
+    if (!includeQuickCheck) {
+      query = query.neq("is_quick_check", true);
+    }
+
+    const { data: properties, error: propertiesError } = await query;
 
     if (propertiesError) {
       console.error("[GET /api/properties] DB error:", propertiesError);
@@ -121,6 +130,7 @@ export async function POST(request: NextRequest) {
         tenancy_start: input.tenancy_start,
         tenancy_end: input.tenancy_end || null,
         lease_notes: input.lease_notes || null,
+        is_quick_check: input.is_quick_check ?? false,
       })
       .select()
       .single();

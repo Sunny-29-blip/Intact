@@ -37,17 +37,12 @@ export function AppFooter() {
             <ul className="space-y-2.5 text-xs font-sans">
               <li>
                 <Link href="/properties" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Register
+                  Properties
                 </Link>
               </li>
               <li>
                 <Link href="/properties" className="text-ink-600 hover:text-ink-900 transition-colors">
                   Photo recording
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Comparison
                 </Link>
               </li>
             </ul>
@@ -59,13 +54,13 @@ export function AppFooter() {
             </h4>
             <ul className="space-y-2.5 text-xs font-sans">
               <li>
-                <Link href="/report/sample" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Inspection report
+                <Link href="/report" className="text-ink-600 hover:text-ink-900 transition-colors">
+                  Two-photo analysis
                 </Link>
               </li>
               <li>
                 <Link href="/report/sample" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Shared report
+                  Sample report
                 </Link>
               </li>
             </ul>
