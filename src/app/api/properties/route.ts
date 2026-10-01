@@ -28,11 +28,18 @@ export async function GET() {
       return apiError("DB_ERROR", "Failed to fetch properties", 500);
     }
 
-    // Fetch inspections with photo counts
-    const { data: inspections, error: inspectionsError } = await supabase
-      .from("inspections")
-      .select("id, property_id, kind, photos(count)")
-      .eq("user_id", user.id);
+    // Fetch inspections with photo counts and tenancy contracts
+    const [{ data: inspections, error: inspectionsError }, { data: contracts }] = await Promise.all([
+      supabase
+        .from("inspections")
+        .select("id, property_id, kind, photos(count)")
+        .eq("user_id", user.id),
+      supabase
+        .from("documents")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("kind", "tenancy_contract"),
+    ]);
 
     if (inspectionsError) {
       console.error("[GET /api/properties] Inspections error:", inspectionsError);
@@ -48,12 +55,22 @@ export async function GET() {
       inspectionMap.set(insp.property_id, current);
     });
 
+    const contractsMap = new Map<string, any>();
+    (contracts || []).forEach((c) => {
+      if (c.property_id) {
+        contractsMap.set(c.property_id, c);
+      }
+    });
+
     const enrichedProperties: PropertyListItem[] = (properties || []).map((prop) => {
       const counts = inspectionMap.get(prop.id) || { move_in: 0, move_out: 0 };
+      const contract = contractsMap.get(prop.id) || null;
       return {
         ...prop,
         move_in_count: counts.move_in,
         move_out_count: counts.move_out,
+        contract,
+        documents_missing: !contract,
       };
     });
 
@@ -98,6 +115,7 @@ export async function POST(request: NextRequest) {
       .from("properties")
       .insert({
         user_id: user.id,
+        tenant_name: input.tenant_name || null,
         name: input.name,
         address: input.address || null,
         tenancy_start: input.tenancy_start,

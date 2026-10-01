@@ -77,16 +77,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const linkedTenants: OwnerLinkedTenant[] = (links || []).map((link) => {
-      const tenantProp = tenantPropsMap[link.tenant_property_id];
+    // 3. Fetch attached property evidence documents
+    const { data: documents, error: docsError } = await adminSupabase
+      .from("documents")
+      .select("*")
+      .eq("owner_property_id", id)
+      .eq("kind", "property_evidence")
+      .order("created_at", { ascending: false });
+
+    if (docsError) {
+      console.error("[GET /api/owner/properties/[id]] Documents Error:", docsError);
+    }
+
+    const docList = documents || [];
+
+    const linkedTenants = (links || []).map((link) => {
+      const tp = tenantPropsMap[link.tenant_property_id];
       return {
         link_id: link.id,
         tenant_id: link.tenant_id,
+        tenant_property_id: link.tenant_property_id,
         display_name: profilesMap[link.tenant_id] || "Tenant",
-        linked_at: link.created_at,
+        property_name: tp?.name || "Rental Property",
         shared: link.shared,
-        report_token: link.shared && tenantProp ? tenantProp.share_token : null,
-        tenant_property_name: link.shared && tenantProp ? tenantProp.name : undefined,
+        report_token: link.shared ? tp?.share_token || null : null,
+        linked_at: link.created_at,
       };
     });
 
@@ -94,6 +109,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ...property,
       linked_tenants_count: linkedTenants.length,
       linked_tenants: linkedTenants,
+      documents: docList,
+      documents_count: docList.length,
+      documents_missing: docList.length === 0,
     };
 
     return apiSuccess(result);
@@ -181,6 +199,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     if (findError || !existing) {
       return apiError("NOT_FOUND", "Owner property not found", 404);
+    }
+
+    // Fetch and remove all documents from storage
+    const { data: docs } = await adminSupabase
+      .from("documents")
+      .select("storage_path")
+      .eq("owner_property_id", id);
+
+    if (docs && docs.length > 0) {
+      await adminSupabase.storage
+        .from("documents")
+        .remove(docs.map((d) => d.storage_path))
+        .catch(() => {});
     }
 
     const { error: deleteError } = await adminSupabase

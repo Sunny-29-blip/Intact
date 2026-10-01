@@ -4,6 +4,21 @@ export type ComparisonStatus = "pending" | "complete" | "failed";
 export type FindingClassification = "damage" | "wear" | "unclear";
 export type FindingSeverity = "minor" | "moderate" | "major";
 export type FindingDecision = "pending" | "accepted" | "disputed";
+export type DocumentKind = "property_evidence" | "tenancy_contract";
+
+export interface Document {
+  id: string;
+  user_id: string;
+  kind: DocumentKind;
+  owner_property_id: string | null;
+  property_id: string | null;
+  storage_path: string;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256: string | null;
+  created_at: string;
+}
 
 export interface Profile {
   user_id: string;
@@ -19,9 +34,12 @@ export interface OwnerProperty {
   name: string;
   address: string | null;
   city: string | null;
+  owner_name?: string | null;
   join_code: string;
   created_at: string;
   linked_tenants_count?: number;
+  documents_count?: number;
+  documents_missing?: boolean;
 }
 
 export interface TenancyLink {
@@ -45,6 +63,7 @@ export interface OwnerLinkedTenant {
 
 export interface OwnerPropertyDetail extends OwnerProperty {
   linked_tenants: OwnerLinkedTenant[];
+  documents: Document[];
 }
 
 export interface TenantLinkedOwnerProperty {
@@ -63,11 +82,14 @@ export interface Property {
   user_id: string;
   name: string;
   address: string | null;
+  tenant_name?: string | null;
   tenancy_start: string; // ISO Date YYYY-MM-DD
   tenancy_end: string | null;
   lease_notes: string | null;
   share_token: string;
   created_at: string;
+  documents_missing?: boolean;
+  contract?: Document | null;
 }
 
 export interface Inspection {

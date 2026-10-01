@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { api, ApiError } from "@/lib/api";
 import { uploadAndRegisterPhoto } from "@/lib/client-photo";
+import { uploadAndRegisterDocument } from "@/lib/client-document";
 import { updatePropertySchema, type UpdatePropertyInput } from "@/lib/validation";
 import { AreaComparisonCard } from "@/components/AreaComparisonCard";
 import type {
@@ -13,7 +14,16 @@ import type {
   PhotoWithUrl,
   ComparisonWithFindings,
   TenantLinkedOwnerProperty,
+  Document,
 } from "@/types/database";
+
+const ALLOWED_MIMES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -40,8 +50,18 @@ export default function PropertyDetailPage({ params }: PageProps) {
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
 
+  // Contract management state
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const [contractUploading, setContractUploading] = useState(false);
+  const [contractUploadStatus, setContractUploadStatus] = useState<string | null>(null);
+  const [contractUploadError, setContractUploadError] = useState<string | null>(null);
+  const [showRemoveContractModal, setShowRemoveContractModal] = useState(false);
+  const [removingContract, setRemovingContract] = useState(false);
+
   // Edit property state
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editTenantName, setEditTenantName] = useState("");
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editTenancyStart, setEditTenancyStart] = useState("");
@@ -95,6 +115,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
       setTenancyLink(existingLink || null);
 
       // Populate edit fields
+      setEditTenantName(propData.tenant_name || "");
       setEditName(propData.name);
       setEditAddress(propData.address || "");
       setEditTenancyStart(propData.tenancy_start);
@@ -170,6 +191,72 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleViewContract = async () => {
+    if (!property?.contract?.id) return;
+    try {
+      const { signedUrl } = await api.getDocumentSignedUrl(property.contract.id);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to load contract URL.");
+    }
+  };
+
+  const handleSaveContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contractFile || contractUploading) return;
+    setContractUploadError(null);
+
+    if (!ALLOWED_MIMES.includes(contractFile.type)) {
+      setContractUploadError("Invalid file type. Only PDF, JPEG, PNG, and WebP are allowed.");
+      return;
+    }
+
+    if (contractFile.size > MAX_FILE_SIZE) {
+      setContractUploadError("File exceeds 10 MB maximum limit.");
+      return;
+    }
+
+    const activeUserId = userId || (await supabase.auth.getUser()).data.user?.id;
+    if (!activeUserId) {
+      setContractUploadError("User authentication not ready. Please refresh.");
+      return;
+    }
+
+    setContractUploading(true);
+    try {
+      await uploadAndRegisterDocument({
+        userId: activeUserId,
+        kind: "tenancy_contract",
+        parentId: propertyId,
+        file: contractFile,
+        onProgress: (status) => setContractUploadStatus(status),
+      });
+
+      setContractFile(null);
+      setShowContractModal(false);
+      await fetchPropertyAndComparisons();
+    } catch (err) {
+      setContractUploadError(err instanceof Error ? err.message : "Failed to upload contract.");
+    } finally {
+      setContractUploading(false);
+      setContractUploadStatus(null);
+    }
+  };
+
+  const handleRemoveContract = async () => {
+    if (!property?.contract?.id || removingContract) return;
+    setRemovingContract(true);
+    try {
+      await api.deleteDocument(property.contract.id);
+      setShowRemoveContractModal(false);
+      await fetchPropertyAndComparisons();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to remove contract.");
+    } finally {
+      setRemovingContract(false);
+    }
+  };
+
   useEffect(() => {
     fetchPropertyAndComparisons();
   }, [propertyId]);
@@ -215,9 +302,10 @@ export default function PropertyDetailPage({ params }: PageProps) {
     setEditError(null);
 
     const payload: UpdatePropertyInput = {
-      name: editName.trim(),
-      address: editAddress.trim() || null,
-      tenancy_start: editTenancyStart,
+      tenant_name: editTenantName.trim() || undefined,
+      name: editName.trim() || undefined,
+      address: editAddress.trim() || undefined,
+      tenancy_start: editTenancyStart || undefined,
       tenancy_end: editTenancyEnd || null,
       lease_notes: editLeaseNotes.trim() || null,
     };
@@ -387,9 +475,32 @@ export default function PropertyDetailPage({ params }: PageProps) {
     setTimeout(() => setCopiedShare(false), 2500);
   };
 
-  const formatSha = (sha?: string) => {
+  const formatSha = (sha?: string | null) => {
     if (!sha || sha.length < 12) return sha || "—";
     return `${sha.slice(0, 8)}…${sha.slice(-6)}`;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const getContractExpiryStatus = (endDateStr?: string | null) => {
+    if (!endDateStr) return null;
+    const end = new Date(endDateStr);
+    if (isNaN(end.getTime())) return null;
+    const now = new Date();
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+    const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const diffDays = Math.round((endDay - nowDay) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      return `Expired ${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} ago (${endDateStr})`;
+    }
+    if (diffDays === 0) {
+      return "Expires today";
+    }
+    return `Expires in ${diffDays} day${diffDays === 1 ? "" : "s"}`;
   };
 
   const formatDate = (iso?: string) => {
@@ -465,9 +576,16 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">
                   {property.name}
                 </h1>
-                {property.address && (
-                  <p className="text-xs text-ink-600 mt-1 font-sans">{property.address}</p>
-                )}
+                <div className="mt-1 space-y-0.5">
+                  {property.address && (
+                    <p className="text-xs text-ink-600 font-sans">{property.address}</p>
+                  )}
+                  {property.tenant_name && (
+                    <p className="text-[11px] font-mono text-ink-500">
+                      Tenant: <strong className="text-ink-800">{property.tenant_name}</strong>
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -503,7 +621,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 text-xs font-mono">
               <div>
                 <span className="block text-[10px] uppercase text-ink-500">
-                  Tenancy Period
+                  Contract Period
                 </span>
                 <span className="font-semibold text-ink-900 mt-0.5 block text-[11px]">
                   {property.tenancy_start}
@@ -512,13 +630,14 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <span className="block text-[10px] uppercase text-ink-500">
-                  Property ID
+                  Contract Status
                 </span>
-                <span
-                  title={property.id}
-                  className="text-[11px] text-ink-700 mt-0.5 block truncate"
-                >
-                  {property.id.slice(0, 18)}…
+                <span className="font-semibold text-ink-900 mt-0.5 block text-[11px]">
+                  {property.contract ? (
+                    <span className="text-accepted">Attached</span>
+                  ) : (
+                    <span className="text-damage">Missing</span>
+                  )}
                 </span>
               </div>
               <div>
@@ -545,6 +664,119 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   Lease Terms / Notes:
                 </span>
                 <span className="font-sans">{property.lease_notes}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Section: Tenancy Contract */}
+          <div className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">
+            <div className="border-b border-ink-200 pb-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                  SECTION · TENANCY CONTRACT
+                </div>
+                <h2 className="text-lg font-bold text-ink-900 mt-0.5">
+                  Tenancy Contract
+                </h2>
+                <p className="text-xs text-ink-600 mt-0.5">
+                  Your private contract with the property owner.
+                </p>
+              </div>
+
+              {property.contract && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleViewContract}
+                    className="px-3 py-1.5 border border-ink-200 hover:border-ink-400 bg-page text-ink-800 text-xs font-semibold uppercase tracking-wider font-mono transition-colors btn-motion lit"
+                  >
+                    View ↗
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContractFile(null);
+                      setContractUploadError(null);
+                      setShowContractModal(true);
+                    }}
+                    className="px-3 py-1.5 border border-ink-200 hover:border-ink-400 bg-page text-ink-800 text-xs font-semibold uppercase tracking-wider font-mono transition-colors btn-motion lit"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRemoveContractModal(true)}
+                    className="px-3 py-1.5 border border-damage-border hover:bg-damage-bg text-damage text-xs font-semibold uppercase tracking-wider font-mono transition-colors btn-motion"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {property.contract ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-page border border-ink-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+                  <div>
+                    <span className="block text-[10px] uppercase text-ink-500">File Name</span>
+                    <span className="font-semibold text-ink-900 block truncate mt-0.5" title={property.contract.original_name}>
+                      {property.contract.original_name}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase text-ink-500">Type & Size</span>
+                    <span className="text-ink-700 block mt-0.5 uppercase">
+                      {property.contract.mime_type.split("/")[1] || "DOCUMENT"} · {formatFileSize(property.contract.size_bytes)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase text-ink-500">Added Date</span>
+                    <span className="text-ink-700 block mt-0.5">
+                      {new Date(property.contract.created_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase text-ink-500">Valid Until</span>
+                    <div className="mt-0.5 flex flex-col">
+                      <span className="font-semibold text-ink-900">
+                        {property.tenancy_end || "Not specified"}
+                      </span>
+                      {getContractExpiryStatus(property.tenancy_end) && (
+                        <span className="text-[10px] text-ink-500 mt-0.5">
+                          {getContractExpiryStatus(property.tenancy_end)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-page border border-ink-200 text-ink-600 font-mono text-[11px]">
+                  <strong>PRIVACY NOTE:</strong> Intact stores these files privately for you. It does not verify them.
+                </div>
+              </div>
+            ) : (
+              <div className="border border-dashed border-ink-200 p-6 bg-page text-center">
+                <div className="text-xs font-mono text-ink-500 uppercase tracking-wider mb-1">
+                  CONTRACT NOT ADDED
+                </div>
+                <p className="text-xs text-ink-600 max-w-md mx-auto mb-4">
+                  No tenancy contract is currently attached to this property. Uploading your agreement stores it privately and links it with your inspection baseline.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContractFile(null);
+                    setContractUploadError(null);
+                    setShowContractModal(true);
+                  }}
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider font-mono transition-colors btn-motion lit-dark"
+                >
+                  + Add contract
+                </button>
               </div>
             )}
           </div>
@@ -982,6 +1214,118 @@ export default function PropertyDetailPage({ params }: PageProps) {
         </>
       )}
 
+      {/* Upload / Replace Contract Modal */}
+      {showContractModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-surface border border-ink-200 max-w-lg w-full p-6 text-xs">
+            <div className="border-b border-ink-200 pb-3 mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-mono uppercase text-ink-500">
+                  TENANCY AGREEMENT · UPLOAD
+                </div>
+                <h2 className="text-base font-bold text-ink-900">
+                  {property?.contract ? "Replace Tenancy Contract" : "Upload Tenancy Contract"}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  if (!contractUploading) setShowContractModal(false);
+                }}
+                disabled={contractUploading}
+                className="text-ink-500 hover:text-ink-900 font-mono text-sm"
+              >
+                [✕]
+              </button>
+            </div>
+
+            {contractUploadError && (
+              <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-damage font-mono">
+                [!] {contractUploadError}
+              </div>
+            )}
+
+            {contractUploadStatus && (
+              <div className="mb-4 p-3 bg-accent-tint border border-accent-border text-accent font-mono animate-pulse">
+                {contractUploadStatus}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveContract} className="space-y-4">
+              <div>
+                <label className="block font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
+                  Select Contract File <span className="text-damage">*</span>
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={(e) => setContractFile(e.target.files?.[0] || null)}
+                  disabled={contractUploading}
+                  className="w-full text-xs text-ink-700 file:mr-2 file:py-1.5 file:px-3 file:border file:border-ink-200 file:bg-surface file:text-xs file:font-mono hover:file:bg-page"
+                />
+                <p className="text-[10px] font-mono text-ink-500 mt-1.5">
+                  Stored privately. Only you can open it. Do not upload ID numbers or bank details.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-ink-100">
+                <button
+                  type="button"
+                  onClick={() => setShowContractModal(false)}
+                  disabled={contractUploading}
+                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={contractUploading || !contractFile}
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50 btn-motion lit-dark"
+                >
+                  {contractUploading ? "Uploading..." : property?.contract ? "Replace Contract" : "+ Upload Contract"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Contract Confirmation Modal */}
+      {showRemoveContractModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-surface border border-damage-border max-w-md w-full p-6 text-xs">
+            <div className="border-b border-ink-200 pb-3 mb-4">
+              <div className="text-[10px] font-mono uppercase text-damage font-bold tracking-wider">
+                CONFIRM REMOVAL
+              </div>
+              <h2 className="text-base font-bold text-ink-900 mt-1">
+                Remove Tenancy Contract?
+              </h2>
+            </div>
+            <p className="text-ink-600 mb-6 leading-relaxed">
+              Are you sure you want to remove your contract (<strong>{property?.contract?.original_name}</strong>)? It will be permanently deleted from secure private storage.
+            </p>
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowRemoveContractModal(false)}
+                disabled={removingContract}
+                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveContract}
+                disabled={removingContract}
+                className="px-4 py-2 bg-damage hover:bg-damage/90 text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50 btn-motion"
+              >
+                {removingContract ? "Removing..." : "Remove Contract"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Property Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -1000,15 +1344,27 @@ export default function PropertyDetailPage({ params }: PageProps) {
             </div>
 
             {editError && (
-              <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-xs text-damage">
-                {editError}
+              <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-xs text-damage font-mono">
+                [!] {editError}
               </div>
             )}
 
             <form onSubmit={handleEditProperty} className="space-y-4 text-xs">
               <div>
                 <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
-                  Property Name <span className="text-damage">*</span>
+                  Your Name <span className="text-damage">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editTenantName}
+                  onChange={(e) => setEditTenantName(e.target.value)}
+                  className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
+                  Flat or House Name <span className="text-damage">*</span>
                 </label>
                 <input
                   type="text"
@@ -1019,7 +1375,9 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">Address</label>
+                <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
+                  Address <span className="text-damage">*</span>
+                </label>
                 <input
                   type="text"
                   value={editAddress}
@@ -1031,7 +1389,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
-                    Tenancy Start <span className="text-damage">*</span>
+                    Contract Start Date <span className="text-damage">*</span>
                   </label>
                   <input
                     type="date"
@@ -1041,7 +1399,9 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">Tenancy End</label>
+                  <label className="block font-mono text-[10px] uppercase text-ink-700 mb-1">
+                    Contract Valid Until <span className="text-damage">*</span>
+                  </label>
                   <input
                     type="date"
                     value={editTenancyEnd}
@@ -1092,7 +1452,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
             </h2>
             <p className="text-ink-600 leading-relaxed mb-4">
               Permanently delete <strong>{property?.name}</strong>?
-              This will remove all move-in and move-out photos from storage and destroy the entire inspection dossier.
+              This will remove all move-in and move-out photos as well as private contract documents from storage and destroy the entire inspection dossier.
             </p>
 
             <div className="flex items-center justify-end space-x-3 pt-4 border-t border-ink-100">

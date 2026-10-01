@@ -26,7 +26,8 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
  */
 export const createOwnerPropertySchema = z.object({
   name: z.string().trim().min(1, "Property name is required").max(150, "Property name is too long"),
-  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
+  address: z.string().trim().min(1, "Address is required").max(500, "Address is too long"),
+  owner_name: z.string().trim().min(1, "Owner name is required").max(100, "Owner name is too long"),
   city: z.string().trim().max(100, "City is too long").optional().nullable(),
 });
 
@@ -37,7 +38,8 @@ export type CreateOwnerPropertyInput = z.infer<typeof createOwnerPropertySchema>
  */
 export const updateOwnerPropertySchema = z.object({
   name: z.string().trim().min(1, "Property name is required").max(150, "Property name is too long").optional(),
-  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
+  address: z.string().trim().min(1, "Address is required").max(500, "Address is too long").optional(),
+  owner_name: z.string().trim().min(1, "Owner name is required").max(100, "Owner name is too long").optional(),
   city: z.string().trim().max(100, "City is too long").optional().nullable(),
 });
 
@@ -63,30 +65,38 @@ export const updateLinkShareSchema = z.object({
 export type UpdateLinkShareInput = z.infer<typeof updateLinkShareSchema>;
 
 /**
- * Validation schema for creating a new property.
+ * Validation schema for creating a new tenant property.
  */
-export const createPropertySchema = z.object({
-  name: z.string().trim().min(1, "Property name is required").max(255, "Property name is too long"),
-  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
-  tenancy_start: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Tenancy start must be a valid date (YYYY-MM-DD)"),
-  tenancy_end: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Tenancy end must be a valid date (YYYY-MM-DD)")
-    .optional()
-    .nullable(),
-  lease_notes: z.string().max(2000, "Lease notes are too long").optional().nullable(),
-});
+export const createPropertySchema = z
+  .object({
+    tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long"),
+    name: z.string().trim().min(1, "Flat or house name is required").max(255, "Name is too long"),
+    address: z.string().trim().min(1, "Address is required").max(500, "Address is too long"),
+    tenancy_start: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Contract start date must be a valid date (YYYY-MM-DD)"),
+    tenancy_end: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Contract valid until date must be a valid date (YYYY-MM-DD)"),
+    lease_notes: z.string().max(2000, "Lease notes are too long").optional().nullable(),
+  })
+  .refine(
+    (data) => !data.tenancy_end || !data.tenancy_start || data.tenancy_end > data.tenancy_start,
+    {
+      message: "Contract valid until date must be after contract start date",
+      path: ["tenancy_end"],
+    }
+  );
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 
 /**
- * Validation schema for updating an existing property.
+ * Validation schema for updating an existing tenant property.
  */
 export const updatePropertySchema = z.object({
-  name: z.string().trim().min(1, "Property name is required").max(255, "Property name is too long").optional(),
-  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
+  tenant_name: z.string().trim().min(1, "Your name is required").max(100, "Name is too long").optional(),
+  name: z.string().trim().min(1, "Flat or house name is required").max(255, "Name is too long").optional(),
+  address: z.string().trim().min(1, "Address is required").max(500, "Address is too long").optional(),
   tenancy_start: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Tenancy start must be a valid date (YYYY-MM-DD)")
@@ -100,6 +110,30 @@ export const updatePropertySchema = z.object({
 });
 
 export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
+
+/**
+ * Validation schema for registering an uploaded document.
+ */
+export const registerDocumentSchema = z.object({
+  kind: z.enum(["property_evidence", "tenancy_contract"], {
+    errorMap: () => ({ message: "Kind must be 'property_evidence' or 'tenancy_contract'" }),
+  }),
+  owner_property_id: z.string().uuid().optional().nullable(),
+  property_id: z.string().uuid().optional().nullable(),
+  storage_path: z.string().min(1, "Storage path is required"),
+  original_name: z.string().min(1, "Original file name is required").max(255, "File name is too long"),
+  mime_type: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"], {
+    errorMap: () => ({ message: "Allowed file types: PDF, JPEG, PNG, WebP" }),
+  }),
+  size_bytes: z
+    .number()
+    .int()
+    .positive("File cannot be empty")
+    .max(10 * 1024 * 1024, "File size must not exceed 10 MB"),
+  sha256: z.string().optional().nullable(),
+});
+
+export type RegisterDocumentInput = z.infer<typeof registerDocumentSchema>;
 
 /**
  * Validation schema for getting or creating an inspection.

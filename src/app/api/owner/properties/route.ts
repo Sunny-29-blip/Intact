@@ -44,23 +44,42 @@ export async function GET() {
 
     const propertyIds = (properties || []).map((p) => p.id);
 
-    // Fetch linked tenants count for these properties
+    // Fetch linked tenants count and document counts for these properties
     let linkCounts: Record<string, number> = {};
+    let docCounts: Record<string, number> = {};
     if (propertyIds.length > 0) {
-      const { data: links } = await adminSupabase
-        .from("tenancy_links")
-        .select("owner_property_id")
-        .in("owner_property_id", propertyIds);
+      const [{ data: links }, { data: docs }] = await Promise.all([
+        adminSupabase
+          .from("tenancy_links")
+          .select("owner_property_id")
+          .in("owner_property_id", propertyIds),
+        adminSupabase
+          .from("documents")
+          .select("owner_property_id")
+          .eq("kind", "property_evidence")
+          .in("owner_property_id", propertyIds),
+      ]);
 
       (links || []).forEach((link) => {
         linkCounts[link.owner_property_id] = (linkCounts[link.owner_property_id] || 0) + 1;
       });
+
+      (docs || []).forEach((doc) => {
+        if (doc.owner_property_id) {
+          docCounts[doc.owner_property_id] = (docCounts[doc.owner_property_id] || 0) + 1;
+        }
+      });
     }
 
-    const propertiesWithCount: OwnerProperty[] = (properties || []).map((p) => ({
-      ...p,
-      linked_tenants_count: linkCounts[p.id] || 0,
-    }));
+    const propertiesWithCount: OwnerProperty[] = (properties || []).map((p) => {
+      const count = docCounts[p.id] || 0;
+      return {
+        ...p,
+        linked_tenants_count: linkCounts[p.id] || 0,
+        documents_count: count,
+        documents_missing: count === 0,
+      };
+    });
 
     return apiSuccess(propertiesWithCount);
   } catch (err) {
@@ -101,7 +120,7 @@ export async function POST(request: NextRequest) {
       return apiError("VALIDATION_ERROR", "Invalid property fields", 400, validation.error.flatten().fieldErrors);
     }
 
-    const { name, address, city } = validation.data;
+    const { name, address, owner_name, city } = validation.data;
 
     // Generate unique join code with retry
     let joinCode = "";
@@ -115,6 +134,7 @@ export async function POST(request: NextRequest) {
           owner_id: user.id,
           name,
           address: address || null,
+          owner_name: owner_name || null,
           city: city || null,
           join_code: joinCode,
         })
@@ -134,6 +154,8 @@ export async function POST(request: NextRequest) {
     return apiSuccess({
       ...inserted,
       linked_tenants_count: 0,
+      documents_count: 0,
+      documents_missing: true,
     }, 201);
   } catch (err) {
     console.error("[POST /api/owner/properties] Unexpected:", err);

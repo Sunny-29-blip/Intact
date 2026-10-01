@@ -138,6 +138,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         }
       : null;
 
+    // Fetch active tenancy contract document
+    const { data: contractDoc } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("property_id", id)
+      .eq("kind", "tenancy_contract")
+      .maybeSingle();
+
     const detail: PropertyDetail = {
       ...property,
       inspections: {
@@ -146,6 +154,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
       move_in_count: moveInPhotos.length,
       move_out_count: moveOutPhotos.length,
+      contract: contractDoc || null,
+      documents_missing: !contractDoc,
     };
 
     return apiSuccess(detail);
@@ -279,7 +289,21 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Delete property record from DB (cascades to inspections, photos, comparisons, findings)
+    // Fetch and remove all documents under this property from documents storage bucket
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("storage_path")
+      .eq("property_id", id)
+      .eq("user_id", user.id);
+
+    if (docs && docs.length > 0) {
+      await supabase.storage
+        .from("documents")
+        .remove(docs.map((d) => d.storage_path))
+        .catch(() => {});
+    }
+
+    // Delete property record from DB (cascades to inspections, photos, comparisons, findings, documents)
     const { error: deleteError } = await supabase
       .from("properties")
       .delete()

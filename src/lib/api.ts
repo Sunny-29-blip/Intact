@@ -11,6 +11,7 @@ import type {
   OwnerProperty,
   OwnerPropertyDetail,
   TenantLinkedOwnerProperty,
+  Document,
 } from "@/types/database";
 import type {
   CreatePropertyInput,
@@ -22,6 +23,7 @@ import type {
   CreateOwnerPropertyInput,
   UpdateOwnerPropertyInput,
   LinkTenancyInput,
+  RegisterDocumentInput,
 } from "@/lib/validation";
 
 class ApiError extends Error {
@@ -207,6 +209,24 @@ export const api = {
     return request<Finding>(`/api/findings/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
+    });
+  },
+
+  // Documents
+  async registerDocument(data: RegisterDocumentInput): Promise<Document> {
+    return request<Document>("/api/documents", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getDocumentSignedUrl(id: string): Promise<{ signedUrl: string }> {
+    return request<{ signedUrl: string }>(`/api/documents/${id}/url`);
+  },
+
+  async deleteDocument(id: string): Promise<{ deleted: boolean }> {
+    return request<{ deleted: boolean }>(`/api/documents/${id}`, {
+      method: "DELETE",
     });
   },
 };

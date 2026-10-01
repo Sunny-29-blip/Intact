@@ -18,14 +18,43 @@ Tenants frequently face unfair security deposit deductions at move-out due to su
 
 Intact uses a secure server-centric architecture. Tenant interactions (managing properties, uploading move-in/move-out photos, initiating comparisons) are executed via authenticated Next.js Server Actions and Route Handlers governed by PostgreSQL Row Level Security (RLS) policies. Photos are stored securely in a private Supabase Storage bucket with strict user-scoped access rules. When comparisons are triggered, a server-only worker fetches the matching move-in and move-out photos, calculates visual diffs using Google Gemini with structured JSON output, and persists normalized bounding-box findings. Read-only landlord reports are served via unique, unguessable share tokens accessed through privileged server clients without exposing private user accounts.
 
-## Roles
+## Roles & Workflows
 
-Intact supports two distinct roles with separate dashboards and strict server-enforced boundaries:
+Intact supports two distinct roles with separate dashboards, field requirements, and strict server-enforced privacy boundaries:
 
-- **Tenant (`role: 'tenant'`)**: Records move-in and move-out condition photos, reviews AI comparison findings, manages deposit dispute justifications, and controls when to share read-only inspection reports. Tenants link to owner properties using an 8-character join code without revealing private account details.
-- **Owner (`role: 'owner'`)**: Registers rental properties to generate unique, unambiguous 8-character join codes (`/owner`). Owners can view linked tenant entries and access read-only inspection reports once explicitly shared by the tenant (`/report/[token]`). Owners have no direct database access to tenant photos or private tenancy records.
+- **Owner (`role: 'owner'`)**:
+  - Adds properties via `/owner` ("+ Add property"):
+    - **Property name** (required)
+    - **Address** (required)
+    - **Owner name** (required; prefilled from profile display name, editable)
+    - **Documents related to the property** (required: 1 to 5 files, e.g., ownership proof, sale deed, property tax receipt)
+  - Generates unique 8-character join codes (`/owner/properties/[id]`) for tenants.
+  - Manages property evidence documents (View via 5-minute signed URLs, Add, Remove).
+  - Views linked tenant entries and accesses read-only inspection reports only when explicitly shared by the tenant.
+  - Has no direct access to tenant contracts, move-in/move-out baseline photos, or private dispute notes.
 
-Database migrations for roles and tenancy links are defined in [`supabase/roles.sql`](supabase/roles.sql).
+- **Tenant (`role: 'tenant'`)**:
+  - Adds properties via `/properties` ("+ Add property"):
+    - **Your name** (required; prefilled from profile, editable)
+    - **Flat or house name** (required)
+    - **Address** (required)
+    - **Contract with the owner** (required: 1 active file, replacing old file on update)
+    - **Contract start date & Contract valid until date** (both required; valid until must be after start date)
+  - Manages tenancy contract with live expiration tracking ("Expires in N days" / "Expired").
+  - Records move-in and move-out condition photos, reviews AI visual comparison findings, and controls report sharing.
+  - Links to owner properties using the join code without exposing private documents.
+
+## Private Documents & Privacy Model
+
+- **Private Storage Bucket (`documents`)**: Files are uploaded to private, non-public Supabase object storage scoped to `{user_id}/{kind}/{parent_id}/{uuid}.{ext}`. Storage and database RLS ensure only the object's owner (`auth.uid()`) can select, insert, or delete.
+- **Short-Lived Signed URLs**: Documents are never exposed publicly. Viewing any document generates a signed URL with a 5-minute expiry after explicit server-side ownership verification.
+- **Strict Role Isolation**: Owners cannot read tenant contracts, and tenants cannot read owner property documents. Non-owners cannot access files by guessing IDs or paths.
+- **AI Isolation**: Uploaded documents and contracts are **never sent to Google Gemini**. Gemini only ever receives move-in and move-out comparison photos.
+- **Document Integrity & Storage Policy**: Client validates file format (PDF, JPEG, PNG, WebP) and 10 MB size limits, computes SHA-256 hashes via `crypto.subtle`, and stores original file names purely for escaped UI display.
+- **Disclaimers & Verification**: Intact stores files privately for user archival purposes and does not make legal claims or verify document legality.
+- **Lifecycle Cleanup**: Deleting an owner property or tenant property permanently deletes all related document objects from storage and cascades database deletions.
+
+Database migrations for roles and documents are defined in [`supabase/roles.sql`](supabase/roles.sql) and [`supabase/documents.sql`](supabase/documents.sql).
 
 ## Setup
 
