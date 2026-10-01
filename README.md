@@ -1,196 +1,189 @@
-# Intact — Tenant Inspection Evidence Engine
+# Intact — Tenancy Condition Inspection App
 
-## Problem
+## Problem and Solution
 
-Tenants frequently face unfair security deposit deductions at move-out due to subjective condition assessments and disorganized photo records. **Intact** is a tenant-side move-in/move-out inspection app that pairs before-and-after area photographs, uses an automated visual comparison (Google Gemini, called only from the server) to describe visible changes as damage, Normal wear or unclear, and compiles a dated record the tenant can share with the owner through a read-only link.
+Tenants frequently face unfair security deposit deductions at move-out due to subjective condition assessments and disorganized photo records. **Intact** is a tenancy condition inspection app that pairs before-and-after area photographs, uses Google Gemini to automatically compare visual changes (classifying differences as property damage, normal wear-and-tear, or unclear), and compiles an organized condition record shareable with landlords.
+
+## Live Application
+
+- **Live URL**: [https://intact-in.vercel.app](https://intact-in.vercel.app)
+- **Demo Video**: *Demo video link will be added here.*
+- **Screenshots**: *Application screenshots will be added here.*
+
+---
 
 ## Features
 
-- Email and password signup with no email confirmation; the user picks a role (tenant or owner) and goes straight to their dashboard. Login, logout, persistent session, a neutral wrong-credentials message, and independent show/hide on each password field.
-- Tenants: add a flat or house (name, address, contract start and end dates, contract file), see contract status, link to an owner property with a join code, and switch report sharing on or off.
-- Owners: add a property (name, address, owner name, evidence documents), get a join code, see linked tenants with contract dates and report status, and open a tenant's report only when the tenant has shared it.
-- Report (`/report`): pick a property, name an area, add move-in and move-out photos (drag and drop, click, or camera on mobile), then "Check for differences". Findings appear as plain cards (what changed, issue type, condition, confidence as High / Medium / Low, notes) with Accept / Reject / Clear. Small numbered markers sit on the move-out photo.
-- Profile: edit name, phone and address; tenants edit their flats, owners their properties; email and role are read-only.
-- Public read-only shared report at `/report/[token]` (printable, not indexed), and a landing page with an example, how it works and limits.
+- **Tenant Dashboard (`/properties`)**:
+  - Register tenancy records with flat/house name, address, contract start date, and contract end date.
+  - Upload and privately store tenancy agreements (PDF, JPEG, PNG, WebP).
+  - Dynamic tenancy countdown and status tracking ("Active", "Ends in N days", "Ended").
+  - Add baseline move-in photos and departure move-out photos organized by area/room.
+  - Trigger automated AI comparisons between paired photos.
+  - Review AI findings: accept findings, dispute findings with personal notes, or leave them pending.
+  - Explicitly toggle condition report sharing with linked property owners.
 
-## How it works
+- **Owner Portal (`/owner`)**:
+  - Register properties with property name, address, owner name, and property evidence documents (e.g. sale deed, property tax receipt).
+  - Generate unique 8-character join codes (`/owner/properties/[id]`) for tenants.
+  - View linked tenant records and tenancy dates.
+  - Access read-only condition reports (`/owner/reports/[linkId]`) only when shared by the tenant.
 
-1. Photos are resized in the browser, hashed with SHA-256 and uploaded to the private `inspection-photos` bucket under the user's own folder; the server records the photo row.
-2. "Check for differences" calls `POST /api/comparisons`. The server checks the session and ownership, downloads both photos from private storage and sends them to Gemini in JSON mode with a 45-second timeout.
-3. The response is validated with Zod. Malformed output, timeouts and missing photos return a friendly `{ error: { code, message } }` and the comparison is marked failed.
-4. Valid findings are saved to `findings`; the tenant's Accept / Reject / Clear decisions are saved with `PATCH /api/findings/[id]`.
-5. Photos are shown through short-lived signed URLs only.
+- **Two-Photo Report & Comparison (`/report`, `/properties/[id]/compare/[area]`)**:
+  - Side-by-side inspection view of baseline move-in and departure move-out photographs.
+  - Interactive visual bounding boxes overlaid on departure images.
+  - Structured difference classifications: `damage`, `wear`, or `unclear`.
+  - Issue categorization: `scratch`, `crack`, `stain`, `hole`, `missing_item`, `mark`, or `other`.
+  - Severity indicators (`minor`, `moderate`, `major`) and AI confidence scores.
 
-## Architecture
+- **User Profile (`/profile`)**:
+  - View authenticated account email, creation timestamp, and assigned role (`tenant` or `owner`).
+  - Update profile display name, phone number, and address information.
 
-- `src/app` — App Router pages and `api/*` route handlers. Every route returns `{ data }` or `{ error: { code, message } }`.
-- `src/middleware.ts` — refreshes the Supabase session, redirects logged-out users and keeps tenants and owners on their own pages.
-- `src/lib/supabase/server.ts` (server-only) — cookie-based client plus an admin client for the few server tasks that need it.
-- `src/lib/gemini.ts`, `src/lib/env.ts` (server-only) — Gemini call and environment validation.
-- `supabase/*.sql` — tables, RLS policies and private buckets.
+- **Public & Shared Links (`/report/[token]`)**:
+  - Read-only condition report view accessible via unique share token for dispute resolution.
 
-## Tech Stack
+---
 
-- **Framework**: Next.js 15 (App Router, React 19, TypeScript)
-- **Styling & Design System**: Tailwind CSS (document aesthetic: warm off-white paper, ink typography, semantic status tokens)
-- **Database & Storage**: Supabase (PostgreSQL with Row Level Security, private object storage for photos)
-- **Authentication**: Supabase Auth via `@supabase/ssr` (Email & Password, server session validation)
-- **AI / Computer Vision Comparison**: Google Gemini Flash (`@google/genai` SDK, server-only structured JSON mode with Zod validation)
-- **Schema Validation**: Zod
-- **Deployment**: Vercel
+## How the AI Is Used
 
-## Backend Architecture & API
+All visual condition analysis is executed strictly on the server:
 
-The Intact backend is built on Supabase (PostgreSQL with Row Level Security, Auth, and Storage) and Next.js 15 Server Route Handlers. All multimodal AI comparisons are executed server-side via Google Gemini (`gemini-2.5-flash`).
+1. **Server Route Execution**: The client triggers analysis via `POST /api/comparisons`. The server route downloads the move-in and move-out images directly from private Supabase storage.
+2. **Multimodal Gemini Pipeline**: Both images, along with tenancy duration context, area label, and lease notes, are sent to Google Gemini Flash (`gemini-2.5-flash`) using `@google/genai`.
+3. **Structured JSON Mode & Zod Validation**: The model runs under system instructions tuned for objective physical differences and outputs structured JSON. The response is validated server-side using Zod (`geminiComparisonResponseSchema`), ensuring bounding box coordinates are clamped between 0 and 1000.
+4. **Persistent Findings**: Validated differences are stored in PostgreSQL (`findings` table) linked to the comparison record.
+5. **Tenant Review Decisions**: Tenants review each finding in the UI, marking decisions as accepted or disputed with an explanation note.
+6. **Zero Client Leakage**: The Google Gemini API key (`GEMINI_API_KEY`) is stored strictly in server-side environment variables and is never transmitted to or accessible from the browser.
 
-### Core Backend Capabilities
-- **Authentication & Roles**: Email/password authentication via Supabase Auth. User profiles determine role (`tenant` or `owner`). Middleware enforces route protection, unauthenticated redirects, and role isolation.
-- **Contract Status Engine**: Shared helper (`lib/contract-status.ts`) calculates calendar-accurate tenancy duration ("Active", "Ends in N days", "Ended") without timezone drift.
-- **Two-Photo Report Pipeline**: Move-in baseline and move-out departure photographs are resized in-browser, SHA-256 hashed, uploaded to private storage, and compared on the server with Gemini structured JSON output and Zod validation. Findings and tenant review decisions (Accepted / Rejected / Not reviewed) persist directly in Postgres.
-- **Owner & Tenant Dashboards**: Tenants control private condition records and toggle report sharing per property. Owners manage join codes and access read-only condition reports (`/owner/reports/[linkId]`) only when shared by the tenant.
-- **Security Boundaries**: Private storage buckets, server-only secret keys and Gemini tokens, time-limited signed URLs, and strict RLS policies.
+---
 
-For complete backend architecture, database schemas, and API documentation, see [`docs/backend.md`](docs/backend.md).
+## Architecture & Technology Stack
 
-## Roles & Workflows
+The table below contrasts Intact's implementation against the suggested hackathon reference stack:
 
-Intact supports two distinct roles with separate dashboards, field requirements, and strict server-enforced privacy boundaries:
+| Layer | Hackathon Suggested Stack | Intact Implementation | Architectural Rationale & Differences |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | React (Vite + React Router) | React 19 via Next.js 15 App Router | **Differs from Vite**: Leverages Next.js App Router for unified routing, React 19 server components, and co-located server route handlers. |
+| **Backend** | Node.js (Express) | Node.js via Next.js Route Handlers (`/api/*`) on Vercel Serverless | **Differs from Express**: Replaces a standalone Express server with serverless route handlers deployed on Vercel, providing zero-maintenance scaling and shared TypeScript types. |
+| **Authentication** | Custom JWT / bcrypt | Supabase Auth (JWT sessions & `@supabase/ssr`) | **Differs from custom JWT/bcrypt**: Uses Supabase Auth for session tokens, secure password hashing, and cookie management rather than hand-rolled JWTs. |
+| **Validation** | Zod | Zod (v3.24) | **Matches reference**: Used for all incoming API payloads, client forms, and Gemini JSON schema verification. |
+| **Database** | PostgreSQL | Supabase PostgreSQL with Row Level Security (RLS) | **Matches PostgreSQL**: Uses managed PostgreSQL with database-level RLS policies to isolate tenant and owner data securely. |
+| **Object Storage** | Cloud Storage | Supabase Private Storage Buckets | Provides private storage buckets (`inspection-photos`, `documents`) with access restricted via RLS and signed URLs. |
+| **AI / Vision** | Google Gemini | Google Gemini Flash (`@google/genai` SDK) | **Matches reference**: Multimodal vision analysis executed server-side with `gemini-2.5-flash`. |
 
-- **Owner (`role: 'owner'`)**:
-  - Adds properties via `/owner` ("+ Add property"):
-    - **Property name** (required)
-    - **Address** (required)
-    - **Owner name** (required; prefilled from profile display name, editable)
-    - **Documents related to the property** (required: 1 to 5 files, e.g., ownership proof, sale deed, property tax receipt)
-  - Generates unique 8-character join codes (`/owner/properties/[id]`) for tenants.
-  - Manages property evidence documents (View via 5-minute signed URLs, Add, Remove).
-  - Views linked tenant entries and accesses read-only inspection reports only when explicitly shared by the tenant.
-  - Has no direct access to tenant contracts, move-in/move-out baseline photos, or private dispute notes.
+---
 
-- **Tenant (`role: 'tenant'`)**:
-  - Adds properties via `/properties` ("+ Add property"):
-    - **Your name** (required; prefilled from profile, editable)
-    - **Flat or house name** (required)
-    - **Address** (required)
-    - **Contract with the owner** (required: 1 active file, replacing old file on update)
-    - **Contract start date & Contract valid until date** (both required; valid until must be after start date)
-  - Manages tenancy contract with live expiration tracking ("Expires in N days" / "Expired").
-  - Records move-in and move-out condition photos, reviews AI visual comparison findings, and controls report sharing.
-  - Links to owner properties using the join code without exposing private documents.
+## Setup and Local Development
 
-## Private Documents & Privacy Model
+### 1. Prerequisites
+- Node.js 20+ (Node.js 22 recommended)
+- A [Supabase](https://supabase.com) account and project
+- A [Google AI Studio](https://aistudio.google.com) Gemini API key
 
-- **Private Storage Bucket (`documents`)**: Files are uploaded to private, non-public Supabase object storage scoped to `{user_id}/{kind}/{parent_id}/{uuid}.{ext}`. Storage and database RLS ensure only the object's owner (`auth.uid()`) can select, insert, or delete.
-- **Short-Lived Signed URLs**: Documents are never exposed publicly. Viewing any document generates a signed URL with a 5-minute expiry after explicit server-side ownership verification.
-- **Strict Role Isolation**: Owners cannot read tenant contracts, and tenants cannot read owner property documents. Non-owners cannot access files by guessing IDs or paths.
-- **AI Isolation**: Uploaded documents and contracts are **never sent to Google Gemini**. Gemini only ever receives move-in and move-out comparison photos.
-- **Document Integrity & Storage Policy**: Client validates file format (PDF, JPEG, PNG, WebP) and 10 MB size limits, computes SHA-256 hashes via `crypto.subtle`, and stores original file names purely for escaped UI display.
-- **Disclaimers & Verification**: Intact stores files privately for user archival purposes and does not make legal claims or verify document legality.
-- **Lifecycle Cleanup**: Deleting an owner property or tenant property permanently deletes all related document objects from storage and cascades database deletions.
+### 2. Installation
+```bash
+git clone https://github.com/Sunny-29-blip/Intact.git
+cd Intact
+npm install
+```
+
+### 3. Database & Storage Setup
+1. In your Supabase Project Dashboard, navigate to the **SQL Editor**.
+2. Open [`supabase/full-setup.sql`](supabase/full-setup.sql), copy its entire contents, and execute it. This creates all tables (`profiles`, `properties`, `owner_properties`, `tenancy_links`, `inspections`, `photos`, `comparisons`, `findings`, `documents`, `watch_events`), indexes, RLS policies, and private storage buckets (`inspection-photos`, `documents`).
+3. In **Authentication** → **Providers** → **Email**, disable **"Confirm email"** to allow instant account activation during evaluation.
+
+### 4. Configure Environment Variables
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
+```
+Provide the required variable values:
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase anonymous/publishable key
+- `SUPABASE_SECRET_KEY` — Supabase service role secret key (server-only)
+- `GEMINI_API_KEY` — Google Gemini API key (server-only)
+- `GEMINI_MODEL` — Gemini model identifier (`gemini-2.5-flash`)
+- `NEXT_PUBLIC_SHOW_DEMO_LOGIN` — `true` to show demo account autofill buttons on `/login`
+
+### 5. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### 6. Production Build
+```bash
+npm run build
+```
+
+---
+
+## Roles & Privacy Model
+
+Intact enforces strict separation between roles:
+
+- **Tenants (`role: 'tenant'`)**:
+  - Have full control over their properties, contracts, and photographs.
+  - Can link to an owner's property using an 8-character join code.
+  - Retain control of report visibility via an explicit "Share report" toggle.
+- **Owners (`role: 'owner'`)**:
+  - Manage properties and generate join codes for prospective or current tenants.
+  - Upload ownership and tax documents visible only to themselves.
+  - **Sharing Boundary**: Owners can see tenant photos, condition reports, and AI findings **only after the tenant explicitly shares the report**. Prior to sharing, the owner sees only the linked tenancy status ("Not shared") and cannot view baseline or departure photographs.
+
+---
 
 ## Demo Accounts
 
-For testing and evaluating Intact, 8 pre-configured demo accounts are provided with realistic tenancy and ownership records:
+For evaluation, 8 demo accounts are configured with realistic tenancies and condition records:
 
-| Email | Role | Name | Tenancy / Property | What to Look At |
+| Email | Role | Name | Property / Tenancy | What to Look At |
 | :--- | :--- | :--- | :--- | :--- |
-| `demo.owner1@example.com` | Owner | Meera Kulkarni | Sunrise Residency, Block B, Pune | Linked tenants, shared reports (Tenants 1 & 3), not shared status (Tenant 2) |
-| `demo.owner2@example.com` | Owner | Rajesh Menon | Lakeview Apartments, Hyderabad | Linked tenants (Tenants 4 & 5), empty report statuses, property evidence |
-| `demo.tenant1@example.com` | Tenant | Ananya Rao | Flat 4B, Sunrise Residency | Ends in 20 days notice, shared report with owner, reviewed AI findings (accepted/rejected) |
-| `demo.tenant2@example.com` | Tenant | Imran Sheikh | Flat 2A, Sunrise Residency | Active contract (9 months remaining), report NOT shared with owner, living room check |
-| `demo.tenant3@example.com` | Tenant | Priya Nair | Flat 7C, Sunrise Residency | Active contract, shared report with owner, bathroom check (clean/no differences) |
-| `demo.tenant4@example.com` | Tenant | Karthik Reddy | Apartment 301, Lakeview | Contract ended 10 days ago notice, linked to Owner 2, report not started |
-| `demo.tenant5@example.com` | Tenant | Sneha Joshi | Apartment 204, Lakeview | Active contract, linked to Owner 2, report not started |
-| `demo.tenant6@example.com` | Tenant | Arjun Patel | Room 12, Green Park PG | Active independent tenancy, NOT linked to any owner |
+| `demo.owner1@example.com` | Owner | Meera Kulkarni | Sunrise Residency, Block B, Pune | Linked tenants, shared reports (Tenants 1 & 3), unshared status (Tenant 2) |
+| `demo.owner2@example.com` | Owner | Rajesh Menon | Lakeview Apartments, Hyderabad | Linked tenants (Tenants 4 & 5), empty report statuses, property evidence docs |
+| `demo.tenant1@example.com` | Tenant | Ananya Rao | Flat 4B, Sunrise Residency | "Ends in 20 days" alert, shared report, accepted/disputed AI findings |
+| `demo.tenant2@example.com` | Tenant | Imran Sheikh | Flat 2A, Sunrise Residency | Active tenancy (9 months left), report NOT shared with owner, living room check |
+| `demo.tenant3@example.com` | Tenant | Priya Nair | Flat 7C, Sunrise Residency | Active tenancy, report SHARED with owner, bathroom check (no differences) |
+| `demo.tenant4@example.com` | Tenant | Karthik Reddy | Apartment 301, Lakeview | "Contract ended 10 days ago" notice, report not started |
+| `demo.tenant5@example.com` | Tenant | Sneha Joshi | Apartment 204, Lakeview | Active tenancy, linked to Owner 2, no report started |
+| `demo.tenant6@example.com` | Tenant | Arjun Patel | Room 12, Green Park PG | Independent active tenancy, NOT linked to any owner |
 
-### Shared Demo Password
-```text
-IntactDemo#2026
-```
+### Demo Credentials
+- **Shared Password**: `IntactDemo#2026`
+- **Demo Login**: When `NEXT_PUBLIC_SHOW_DEMO_LOGIN=true`, the `/login` page provides quick-fill buttons for demo credentials.
 
-### Seeding and Resetting Demo Data
-- **Seed Demo Accounts & Comparison Data**:
+### Seeding and Resetting
+- **Seed Demo Data**:
   ```bash
   npm run seed:demo
   ```
-- **Reset Demo Accounts & Clean Storage**:
+- **Reset Demo Data**:
   ```bash
   npm run seed:demo -- --reset --yes
   ```
 
-### Important Notes
-- **Sample Photos**: All condition comparison photos in demo accounts are genuine sample property photos placed in `public/assets/`.
-- **Real AI Pipeline**: The condition analysis and findings are generated by the real Google Gemini multimodal comparison pipeline at seed time (never hardcoded or faked).
-- **Relative Dates**: All tenancy start dates and expiration countdowns are dynamically calculated relative to the date the seed script is run.
-- **Public Demo Password**: The demo password is public by design to allow instant evaluation by judges and testers.
+*Notes on Demo Data*:
+- Sample photos are placed in `demo-assets/`.
+- Visual comparisons are executed through the live Gemini multimodal pipeline at seed time (never hardcoded).
+- Tenancy dates and countdowns are calculated relative to the day the seed script is run.
+- The demo password is public by design for reviewer testing.
 
-## Setup
+---
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repo-url>
-   cd intact
-   ```
+## Security Architecture
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+- **Private Storage Buckets**: Storage buckets (`inspection-photos` and `documents`) are private. Direct public access is disabled.
+- **Row Level Security (RLS)**: PostgreSQL tables and storage objects enforce RLS policies matching `auth.uid()`. Cross-user data leakage is blocked at the database engine level.
+- **Server-Side Secret Isolation**: Secrets (`SUPABASE_SECRET_KEY`, `GEMINI_API_KEY`) are kept in server environment variables and never exposed to browser bundles.
+- **Time-Limited Signed URLs**: Inspection photos and contract documents are accessed exclusively via temporary signed URLs with 1-hour or 5-minute expiry limits.
+- **Document Protection**: Tenancy contracts and property deeds are stored privately for user records and are never transmitted to Google Gemini.
 
-3. **Configure the Database & Storage in Supabase**:
-   - Open your Supabase Project Dashboard.
-   - Navigate to the **SQL Editor**.
-   - Run these files in order (each is safe to re-run except where noted in the file): `supabase/schema.sql`, `supabase/roles.sql`, `supabase/report.sql`, `supabase/documents.sql`, `supabase/fix-properties.sql`, `supabase/fix-final.sql`.
-   - In Authentication settings, turn off "Confirm email" so signup goes straight to the dashboard.
-
-4. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `GEMINI_API_KEY` and optionally `GEMINI_MODEL` and `NEXT_PUBLIC_SHOW_DEMO_LOGIN` in `.env.local`. Never commit this file.
-
-5. **Start the Development Server**:
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Environment Variables
-
-| Variable | Description | Exposed to Client |
-| :--- | :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable / Anon API Key | Yes |
-| `SUPABASE_SECRET_KEY` | Supabase Service Role / Secret Key | No (Server only) |
-| `GEMINI_API_KEY` | Google Gemini API Key | No (Server only) |
-| `GEMINI_MODEL` | Gemini Model ID (Recommended: `gemini-2.5-flash`) | No (Server only) |
-
-## Security notes
-
-- Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` reach the browser. `SUPABASE_SECRET_KEY` and `GEMINI_API_KEY` are read only in `server-only` modules.
-- Protected API routes check the session (and role on owner routes) and validate input with Zod.
-- Owners can read a tenant's report only through a tenancy link the tenant has shared.
-- Both storage buckets are private; photos and documents are served with short-lived signed URLs.
-- Row Level Security is enabled on every table.
+---
 
 ## Limitations
 
-- Automated comparison can be wrong. Not legal advice.
-- A file hash shows a file has not changed since upload, not when it was taken.
-- Email addresses are not verified in this demo.
-
-## Deployment
-
-- **Live URL**: [https://intact-in.vercel.app](https://intact-in.vercel.app)
-- **Vercel Project**: [https://vercel.com/puttusrinivasulu29-4065/intact](https://vercel.com/puttusrinivasulu29-4065/intact)
-
-Deployed on Vercel with automated GitHub integration and serverless environment variable encryption.
-
-## Screenshots
-
-*Screenshots: add here.*
-
-## Demo Video
-
-*Demo video link*
-[https://drive.google.com/drive/folders/1p866xlBg3FUQoOqUmZ5GuYdoAn120-bI?usp=sharing]
+- **Automated Comparison Nuances**: Computer vision models can occasionally produce false positives or misclassify lighting differences and minor perspective shifts.
+- **Not Legal Advice**: Intact generates condition comparison records. It does not provide legal advice, determine security deposit deductions, or establish legal liability.
+- **Cryptographic File Hashes**: SHA-256 hashes generated at upload prove that a file has not been modified since it was uploaded to the platform; they do not verify the external physical date when the photo was originally taken.
+- **Email Verification**: Email verification is disabled in demo mode to allow frictionless testing.
