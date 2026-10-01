@@ -2,7 +2,20 @@ import { NextRequest } from "next/server";
 import { createServerClient, createAdminClient } from "@/lib/supabase/server";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { createProfileSchema, updateProfileSchema } from "@/lib/validation";
-import type { Profile } from "@/types/database";
+import type { Profile, UserRole } from "@/types/database";
+
+function newRefId(): string {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function logStage(refId: string, route: string, stage: string, err: { code?: string; message?: string } | null) {
+  console.error(`[profile ${refId}] ${route} stage=${stage} code=${err?.code ?? "-"} message=${err?.message ?? "-"}`);
+}
+
+/** Role chosen at signup (stored in user metadata), used only when no profile row exists yet. */
+function signupRole(user: { user_metadata?: Record<string, unknown> }): UserRole {
+  return user.user_metadata?.role === "owner" ? "owner" : "tenant";
+}
 
 export async function GET() {
   try {
@@ -34,19 +47,23 @@ export async function GET() {
     if (!profile) {
       const defaultProfile: Omit<Profile, "created_at"> = {
         user_id: user.id,
-        role: "tenant",
+        role: signupRole(user),
         display_name: null,
       };
 
-      const { data: created, error: insertError } = await adminSupabase
+      // ignoreDuplicates: if a concurrent request created the row first, keep it as is.
+      const { error: insertError } = await adminSupabase
         .from("profiles")
-        .insert(defaultProfile)
-        .select()
-        .single();
+        .upsert(defaultProfile, { onConflict: "user_id", ignoreDuplicates: true });
 
-      if (insertError) {
-        console.error("[GET /api/profile] Auto-create Error:", insertError);
-        return apiError("INTERNAL_ERROR", "Failed to initialize profile", 500);
+      const { data: created, error: readError } = insertError
+        ? { data: null, error: insertError }
+        : await adminSupabase.from("profiles").select("*").eq("user_id", user.id).single();
+
+      if (insertError || readError || !created) {
+        const refId = newRefId();
+        logStage(refId, "GET", insertError ? "insert" : "read", insertError || readError);
+        return apiError("INTERNAL_ERROR", "Failed to initialize profile", 500, undefined, refId);
       }
 
       return apiSuccess({
@@ -66,6 +83,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const refId = newRefId();
   try {
     const supabase = await createServerClient();
     const {
@@ -87,42 +105,38 @@ export async function POST(request: NextRequest) {
     const { role, display_name } = validation.data;
     const adminSupabase = createAdminClient();
 
-    // Insert only if row doesn't already exist (role cannot be changed afterwards)
-    const { data: existing } = await adminSupabase
+    // user_id always comes from the session. ignoreDuplicates keeps an existing row
+    // (and its role) unchanged; role cannot be changed after the profile exists.
+    const { error: upsertError } = await adminSupabase
+      .from("profiles")
+      .upsert(
+        { user_id: user.id, role, display_name: display_name || null },
+        { onConflict: "user_id", ignoreDuplicates: true }
+      );
+
+    if (upsertError) {
+      logStage(refId, "POST", "upsert", upsertError);
+      return apiError("INTERNAL_ERROR", "Failed to save profile role", 500, undefined, refId);
+    }
+
+    const { data: saved, error: readError } = await adminSupabase
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (existing) {
-      return apiSuccess({
-        ...existing,
-        email: user.email,
-      });
-    }
-
-    const { data: inserted, error: insertError } = await adminSupabase
-      .from("profiles")
-      .insert({
-        user_id: user.id,
-        role,
-        display_name: display_name || null,
-      })
-      .select()
       .single();
 
-    if (insertError) {
-      console.error("[POST /api/profile] Insert Error:", insertError);
-      return apiError("INTERNAL_ERROR", "Failed to save profile role", 500);
+    if (readError || !saved) {
+      logStage(refId, "POST", "read", readError);
+      return apiError("INTERNAL_ERROR", "Failed to save profile role", 500, undefined, refId);
     }
 
     return apiSuccess({
-      ...inserted,
+      ...saved,
       email: user.email,
     }, 201);
   } catch (err) {
-    console.error("[POST /api/profile] Unexpected:", err);
-    return apiError("INTERNAL_ERROR", "Failed to create profile", 500);
+    logStage(refId, "POST", "unexpected", { message: err instanceof Error ? err.message : String(err) });
+    return apiError("INTERNAL_ERROR", "Failed to create profile", 500, undefined, refId);
   }
 }
 
@@ -145,12 +159,19 @@ export async function PATCH(request: NextRequest) {
       return apiError("VALIDATION_ERROR", "Invalid profile input", 400, validation.error.flatten().fieldErrors);
     }
 
-    const { display_name } = validation.data;
+    // Only send fields the client provided; empty strings are stored as null.
+    const updates: Record<string, string | null> = {};
+    for (const [key, value] of Object.entries(validation.data)) {
+      if (value !== undefined) updates[key] = value === "" ? null : value;
+    }
+    if (Object.keys(updates).length === 0) {
+      return apiError("VALIDATION_ERROR", "Nothing to update", 400);
+    }
     const adminSupabase = createAdminClient();
 
     const { data: updated, error: updateError } = await adminSupabase
       .from("profiles")
-      .update({ display_name })
+      .update(updates)
       .eq("user_id", user.id)
       .select()
       .single();

@@ -2,18 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authSchema } from "@/lib/validation";
-import { api } from "@/lib/api";
 import { PasswordField } from "@/components/PasswordField";
 import type { UserRole } from "@/types/database";
 
 export default function SignupPage() {
-  const router = useRouter();
-
   const [roleTab, setRoleTab] = useState<UserRole>("tenant");
   const [name, setName] = useState("");
+  const [setupError, setSetupError] = useState<{ ref?: string } | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,6 +65,7 @@ export default function SignupPage() {
     e.preventDefault();
     if (loading) return;
     setErrors({});
+    setSetupError(null);
 
     const trimmedEmail = email.trim();
 
@@ -90,19 +88,20 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // 3. Call Supabase signUp (no emailRedirectTo)
+      // 3. Call Supabase signUp (no emailRedirectTo). The chosen role is also kept in
+      // user metadata so a profile created by any other request gets the right role.
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
         options: {
           data: {
             full_name: name.trim() || undefined,
+            role: roleTab,
           },
         },
       });
 
       if (error) {
-        setLoading(false);
         const errorMsg = (error.message || "").toLowerCase();
         if (
           errorMsg.includes("already registered") ||
@@ -124,7 +123,6 @@ export default function SignupPage() {
 
       // Supabase returns identities: [] when email exists and email confirmation is enabled
       if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        setLoading(false);
         setErrors({
           general: "An account with this email already exists. Log in instead.",
         });
@@ -141,7 +139,6 @@ export default function SignupPage() {
         });
 
         if (signInError) {
-          setLoading(false);
           const signInMsg = (signInError.message || "").toLowerCase();
           if (
             signInMsg.includes("email not confirmed") ||
@@ -162,7 +159,6 @@ export default function SignupPage() {
       }
 
       if (!activeSession) {
-        setLoading(false);
         setErrors({
           general:
             "Your account was created, but the project still requires email confirmation. Turn off 'Confirm email' in the Supabase settings.",
@@ -170,20 +166,36 @@ export default function SignupPage() {
         return;
       }
 
-      // Create the profile record server-side with selected role
-      await api.createProfile({
-        role: roleTab,
-        display_name: name.trim() || undefined,
-      }).catch((err) => {
-        console.error("Profile creation error:", err);
-      });
+      // 4. Create the profile on the server (10-second limit). Never redirect without it.
+      let savedRole: UserRole | null = null;
+      let ref: string | undefined;
+      try {
+        const res = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: roleTab, display_name: name.trim() || undefined }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const body = await res.json().catch(() => null);
+        if (res.ok && body?.data?.role) {
+          savedRole = body.data.role as UserRole;
+        } else {
+          ref = body?.error?.ref;
+        }
+      } catch {
+        // Timed out or network failure; handled below.
+      }
 
-      // Go straight to the role's home
-      const destination = roleTab === "owner" ? "/owner" : "/properties";
-      router.push(destination);
-      router.refresh();
+      if (!savedRole) {
+        setSetupError({ ref });
+        return;
+      }
+
+      // 5. Full navigation so the new auth cookie is sent and no stale router cache is used.
+      window.location.assign(savedRole === "owner" ? "/owner" : "/properties");
     } catch {
       setErrors({ general: "A network error occurred. Please try again." });
+    } finally {
       setLoading(false);
     }
   };
@@ -252,6 +264,25 @@ export default function SignupPage() {
                   Log in →
                 </Link>
               )}
+            </div>
+          )}
+
+          {setupError && (
+            <div className="mb-5 p-3 text-xs bg-page border border-ink-300 text-ink-800 flex items-center justify-between gap-3">
+              <div>
+                <span>
+                  Your account was created, but we couldn&apos;t finish setting it up. Please log in again.
+                </span>
+                {setupError.ref && (
+                  <div className="font-mono text-[10px] text-ink-500 mt-1">Reference: {setupError.ref}</div>
+                )}
+              </div>
+              <Link
+                href="/login"
+                className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase whitespace-nowrap"
+              >
+                Log in →
+              </Link>
             </div>
           )}
 

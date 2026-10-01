@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { createComparisonSchema } from "@/lib/validation";
-import { comparePhotosWithGemini } from "@/lib/gemini";
+import { comparePhotosWithGemini, ComparisonError } from "@/lib/gemini";
 import type {
   ComparisonWithFindings,
   PhotoWithUrl,
@@ -10,6 +10,20 @@ import type {
 } from "@/types/database";
 
 export const maxDuration = 60;
+
+const MSG_TEMPORARY = "The comparison could not be completed right now. Please try again in a minute.";
+const MSG_PHOTO = "One of the photos could not be read. Try uploading it again.";
+const MSG_SETUP = "The comparison is not available right now. Please try again later.";
+// Inline image data must stay under the ~20 MB request limit.
+const MAX_INLINE_BYTES = 15 * 1024 * 1024;
+
+function newRefId(): string {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function logStage(refId: string, stage: string, detail: string) {
+  console.error(`[compare ${refId}] stage=${stage} ${detail}`);
+}
 
 function calculateTenancyMonths(startDateStr: string, endDateStr?: string | null): number {
   try {
@@ -144,6 +158,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const refId = newRefId();
+  let failComparison: ((message: string) => Promise<void>) | null = null;
   try {
     const supabase = await createClient();
     const {
@@ -297,6 +313,14 @@ export async function POST(request: NextRequest) {
       comparisonId = newComparison.id;
     }
 
+    failComparison = async (message: string) => {
+      await supabase
+        .from("comparisons")
+        .update({ status: "failed", error: message })
+        .eq("id", comparisonId)
+        .eq("user_id", user.id);
+    };
+
     // 4. Download both images from private bucket on the server
     const { data: moveInBlob, error: d1Err } = await supabase.storage
       .from("inspection-photos")
@@ -306,14 +330,22 @@ export async function POST(request: NextRequest) {
       .from("inspection-photos")
       .download(moveOutPhoto.storage_path);
 
-    if (d1Err || !moveInBlob || d2Err || !moveOutBlob) {
-      const errMessage = "Failed to retrieve photo files from secure storage.";
-      await supabase
-        .from("comparisons")
-        .update({ status: "failed", error: errMessage })
-        .eq("id", comparisonId)
-        .eq("user_id", user.id);
-      return apiError("STORAGE_ERROR", errMessage, 500);
+    if (d1Err || !moveInBlob || d2Err || !moveOutBlob || moveInBlob.size === 0 || moveOutBlob.size === 0) {
+      logStage(
+        refId,
+        "download",
+        `moveIn=${d1Err ? `error:${d1Err.message}` : `${moveInBlob?.size ?? 0}B`} moveOut=${
+          d2Err ? `error:${d2Err.message}` : `${moveOutBlob?.size ?? 0}B`
+        }`
+      );
+      await failComparison(MSG_PHOTO);
+      return apiError("PHOTO_UNREADABLE", MSG_PHOTO, 422, undefined, refId);
+    }
+
+    if (moveInBlob.size + moveOutBlob.size > MAX_INLINE_BYTES) {
+      logStage(refId, "download", `photos too large moveIn=${moveInBlob.size}B moveOut=${moveOutBlob.size}B`);
+      await failComparison(MSG_PHOTO);
+      return apiError("PHOTO_TOO_LARGE", MSG_PHOTO, 413, undefined, refId);
     }
 
     const moveInArrayBuffer = await moveInBlob.arrayBuffer();
@@ -331,7 +363,9 @@ export async function POST(request: NextRequest) {
     try {
       geminiResponse = await comparePhotosWithGemini({
         moveInBase64,
+        moveInMimeType: moveInBlob.type || undefined,
         moveOutBase64,
+        moveOutMimeType: moveOutBlob.type || undefined,
         area,
         propertyName: property.name,
         tenancyMonths,
@@ -340,25 +374,20 @@ export async function POST(request: NextRequest) {
         leaseNotes: property.lease_notes,
         isQuickCheck: Boolean(property.is_quick_check),
         timeoutMs: 45000,
+        refId,
       });
     } catch (aiErr) {
-      const friendlyMessage =
-        aiErr instanceof Error
-          ? aiErr.message.includes("timed out")
-            ? "Visual comparison timed out. Please try again in a few moments."
-            : "The AI comparison service is temporarily unavailable. Please try again."
-          : "Visual comparison failed.";
-
-      await supabase
-        .from("comparisons")
-        .update({
-          status: "failed",
-          error: friendlyMessage,
-        })
-        .eq("id", comparisonId)
-        .eq("user_id", user.id);
-
-      return apiError("AI_COMPARISON_FAILED", friendlyMessage, 500);
+      // Details were already logged by comparePhotosWithGemini under the same refId.
+      const temporary = aiErr instanceof ComparisonError && aiErr.kind === "temporary";
+      const message = temporary ? MSG_TEMPORARY : MSG_SETUP;
+      await failComparison(message);
+      return apiError(
+        temporary ? "COMPARISON_TEMPORARY" : "COMPARISON_UNAVAILABLE",
+        message,
+        temporary ? 503 : 500,
+        undefined,
+        refId
+      );
     }
 
     // 6. Process and clamp findings
@@ -407,7 +436,9 @@ export async function POST(request: NextRequest) {
         .select();
 
       if (insertFindingsErr) {
-        console.error("[POST /api/comparisons] Findings insert error:", insertFindingsErr);
+        logStage(refId, "save", `findings insert code=${insertFindingsErr.code} message=${insertFindingsErr.message}`);
+        await failComparison(MSG_SETUP);
+        return apiError("DB_ERROR", MSG_SETUP, 500, undefined, refId);
       } else if (inserted) {
         insertedFindings = inserted;
       }
@@ -426,7 +457,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (compUpdateErr || !finalComparison) {
-      return apiError("DB_ERROR", "Failed to finalize comparison", 500);
+      logStage(refId, "save", `finalize code=${compUpdateErr?.code ?? "-"} message=${compUpdateErr?.message ?? "no row"}`);
+      await failComparison(MSG_SETUP);
+      return apiError("DB_ERROR", MSG_SETUP, 500, undefined, refId);
     }
 
     // Generate signed URLs for both photos
@@ -457,7 +490,8 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(responsePayload, 200);
   } catch (err) {
-    console.error("[POST /api/comparisons] Unexpected error:", err);
-    return apiError("INTERNAL_ERROR", "An unexpected error occurred during comparison", 500);
+    logStage(refId, "unexpected", `name=${err instanceof Error ? err.name : typeof err} message=${err instanceof Error ? err.message : String(err)}`);
+    if (failComparison) await failComparison(MSG_SETUP).catch(() => undefined);
+    return apiError("INTERNAL_ERROR", MSG_SETUP, 500, undefined, refId);
   }
 }

@@ -17,6 +17,22 @@ export type CreateProfileInput = z.infer<typeof createProfileSchema>;
  */
 export const updateProfileSchema = z.object({
   display_name: z.string().trim().min(1, "Display name cannot be empty").max(100, "Name is too long").optional().nullable(),
+  phone: z
+    .string()
+    .trim()
+    .max(20, "Phone number is too long")
+    .regex(/^[0-9+\-\s()]*$/, "Use digits, spaces, + or - only")
+    .optional()
+    .nullable(),
+  address_line: z.string().trim().max(300, "Address is too long").optional().nullable(),
+  city: z.string().trim().max(100, "City is too long").optional().nullable(),
+  state: z.string().trim().max(100, "State is too long").optional().nullable(),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^([0-9]{6})?$/, "PIN code should be 6 digits")
+    .optional()
+    .nullable(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

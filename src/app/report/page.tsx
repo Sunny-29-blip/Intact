@@ -49,6 +49,7 @@ export default function ReportDashboardPage() {
   // Comparison execution state
   const [comparing, setComparing] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparisonErrorRef, setComparisonErrorRef] = useState<string | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonWithFindings | null>(null);
 
   // Interactive Finding Card / Marker linking
@@ -288,6 +289,7 @@ export default function ReportDashboardPage() {
           ? err.message
           : "Comparison could not be completed. Please try again.";
       setComparisonError(message);
+      setComparisonErrorRef(err instanceof ApiError ? err.ref || null : null);
       setLiveAnnouncement(`Error: ${message}`);
     } finally {
       setComparing(false);
@@ -756,6 +758,9 @@ export default function ReportDashboardPage() {
                     Notice
                   </div>
                   <div>{comparisonError}</div>
+                  {comparisonErrorRef && (
+                    <div className="font-mono text-[10px] text-ink-500 mt-1">Reference: {comparisonErrorRef}</div>
+                  )}
                 </div>
                 <button
                   type="button"

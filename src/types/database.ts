@@ -32,6 +32,11 @@ export interface Profile {
   user_id: string;
   role: UserRole;
   display_name: string | null;
+  phone?: string | null;
+  address_line?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
   created_at: string;
   email?: string;
 }
@@ -192,6 +197,7 @@ export interface ApiResponse<T> {
     code: string;
     message: string;
     details?: Record<string, string[]>;
+    ref?: string;
   };
 }
 
