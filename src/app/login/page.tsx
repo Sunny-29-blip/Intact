@@ -28,8 +28,8 @@ function LoginForm() {
     setErrors({});
     setRoleNotice(null);
 
-    const trimmedEmail = email.trim();
-    const validation = authSchema.safeParse({ email: trimmedEmail, password });
+    const cleanEmail = email.trim().toLowerCase();
+    const validation = authSchema.safeParse({ email: cleanEmail, password });
     if (!validation.success) {
       const fieldErrors = validation.error.flatten().fieldErrors;
       setErrors({
@@ -40,40 +40,61 @@ function LoginForm() {
     }
 
     setLoading(true);
+    const refId = Math.random().toString(36).substring(2, 8);
+
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
+        email: cleanEmail,
         password,
       });
 
       if (authError) {
-        setLoading(false);
-        const errorMsg = (authError.message || "").toLowerCase();
-        const status = (authError as { status?: number }).status;
-        if (status === 429 || errorMsg.includes("rate limit") || errorMsg.includes("too many requests")) {
-          setErrors({ general: "Too many attempts. Wait a minute and try again." });
-        } else {
+        const errCode = ((authError as { code?: string }).code || "").toLowerCase();
+        const errMsg = (authError.message || "").toLowerCase();
+        const errStatus = (authError as { status?: number }).status;
+
+        console.error(`[Login ref:${refId}] Status: ${errStatus}, Code: ${errCode}, Message: ${authError.message}`);
+
+        if (errCode === "email_not_confirmed" || errMsg.includes("email not confirmed")) {
+          setErrors({
+            general: `This account was created but never activated. Please ask the project owner to reset it, or sign up with a different email. (ref ${refId})`,
+          });
+        } else if (
+          errStatus === 429 ||
+          errCode === "over_request_rate_limit" ||
+          errMsg.includes("rate limit") ||
+          errMsg.includes("too many requests")
+        ) {
+          setErrors({
+            general: "Too many attempts. Wait a minute and try again.",
+          });
+        } else if (
+          errCode === "invalid_credentials" ||
+          errMsg.includes("invalid login credentials") ||
+          errMsg.includes("invalid credentials")
+        ) {
           // Never reveal if email exists or password was wrong
           setErrors({
             general: "We couldn't find an account with that email and password. Check them, or create an account.",
+          });
+        } else {
+          setErrors({
+            general: `Something went wrong. Please try again. (ref ${refId})`,
           });
         }
         return;
       }
 
-      // Read profile role from server API
+      // Read profile role from server API (creates a tenant profile if none exists)
       const profile = await api.getProfile().catch(() => ({ role: "tenant" as UserRole }));
-      const userRole = profile.role || "tenant";
+      const userRole = profile?.role || "tenant";
+      const destination = userRole === "owner" ? "/owner" : (nextPath || "/properties");
 
-      if (userRole === "owner") {
-        router.push("/owner");
-        router.refresh();
-      } else {
-        router.push(nextPath || "/properties");
-        router.refresh();
-      }
-    } catch {
-      setErrors({ general: "A network error occurred. Please try again." });
+      window.location.assign(destination);
+    } catch (err) {
+      console.error(`[Login exception ref:${refId}]`, err);
+      setErrors({ general: `Something went wrong. Please try again. (ref ${refId})` });
+    } finally {
       setLoading(false);
     }
   };
