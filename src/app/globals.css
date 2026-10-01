@@ -29,6 +29,96 @@
   }
 }
 
+/* =========================================================================
+   PHASE 2 & 3: AMBIENT HOVER LIGHT & INTERACTIVE MOTION
+   ========================================================================= */
+
+.lit,
+.lit-dark,
+.lit-paper {
+  position: relative;
+  --mx: 50%;
+  --my: 50%;
+}
+
+.lit::before,
+.lit-dark::before,
+.lit-paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--dur-light-out) var(--ease-soft);
+  z-index: 1;
+}
+
+/* Light color per surface:
+   - On white sheets (.lit): teal accent at ~5% alpha
+   - On paper-colored areas (.lit-paper): white at ~60%
+   - On dark teal button (.lit-dark): white at ~12% */
+.lit::before {
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(11, 61, 74, 0.05) 0%, rgba(11, 61, 74, 0) 70%);
+}
+
+.lit-dark::before {
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+.lit-paper::before {
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+/* Hover behaviors scoped strictly to hover-capable devices */
+@media (hover: hover) and (pointer: fine) {
+  .lit:hover::before,
+  .lit-dark:hover::before,
+  .lit-paper:hover::before {
+    opacity: 1;
+    transition: opacity var(--dur-light-in) var(--ease-soft);
+  }
+
+  .interactive-row {
+    transition: transform var(--dur-ui) var(--ease-soft), border-color var(--dur-ui) var(--ease-soft), background-color var(--dur-ui) var(--ease-soft);
+  }
+
+  .interactive-row:hover {
+    transform: translateY(-1px);
+    border-color: #9CA3AF;
+  }
+}
+
+/* Focus-visible reveals the ambient light gently with keyboard focus */
+.lit:focus-visible::before,
+.lit-dark:focus-visible::before,
+.lit-paper:focus-visible::before {
+  opacity: 1;
+  transition: opacity var(--dur-light-in) var(--ease-soft);
+}
+
+/* Button physical press feedback */
+.btn-motion {
+  position: relative;
+  transition: background-color var(--dur-ui) var(--ease-soft), border-color var(--dur-ui) var(--ease-soft), transform 220ms var(--ease-soft);
+}
+
+.btn-motion:active {
+  transform: translateY(1px);
+  transition-duration: 80ms;
+}
+
+/* Photo frame restrained hover */
+@media (hover: hover) and (pointer: fine) {
+  .photo-frame {
+    transition: border-color var(--dur-ui) var(--ease-soft), transform var(--dur-light-in) var(--ease-soft);
+  }
+  .photo-frame:hover {
+    border-color: #9CA3AF;
+    transform: scale(1.008);
+  }
+}
+
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
