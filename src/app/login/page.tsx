@@ -142,6 +142,42 @@ function LoginForm() {
           </div>
         )}
 
+        {process.env.NEXT_PUBLIC_SHOW_DEMO_LOGIN === "true" && (
+          <div className="mb-6 p-3.5 bg-page border border-ink-200">
+            <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-2 font-semibold">
+              Try a demo account
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("tenant");
+                  setEmail("demo.tenant1@example.com");
+                  setPassword("IntactDemo#2026");
+                  setErrors({});
+                  setRoleNotice(null);
+                }}
+                className="px-3 py-1.5 bg-surface hover:bg-white text-ink-800 border border-ink-300 hover:border-ink-500 text-xs font-mono font-medium transition-colors btn-motion lit"
+              >
+                Demo tenant
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("owner");
+                  setEmail("demo.owner1@example.com");
+                  setPassword("IntactDemo#2026");
+                  setErrors({});
+                  setRoleNotice(null);
+                }}
+                className="px-3 py-1.5 bg-surface hover:bg-white text-ink-800 border border-ink-300 hover:border-ink-500 text-xs font-mono font-medium transition-colors btn-motion lit"
+              >
+                Demo owner
+              </button>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">

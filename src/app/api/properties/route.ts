@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (!profile) {
-      await adminSupabase
+      const { error: profErr } = await adminSupabase
         .from("profiles")
-        .insert({ user_id: user.id, role: "tenant", display_name: null })
-        .catch((e) => {
-          console.error(`[${refId}] [GET /api/properties] Auto-create profile notice:`, e);
-        });
+        .insert({ user_id: user.id, role: "tenant", display_name: null });
+      if (profErr) {
+        console.error(`[${refId}] [GET /api/properties] Auto-create profile notice:`, profErr);
+      }
     }
 
     // Fetch user's properties with graceful fallback if column is_quick_check does not exist
@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
     // Fetch inspections, documents, and tenancy links gracefully
     const [
       { data: inspections, error: inspectionsError },
-      documentsRes,
-      tenancyLinksRes,
+      { data: contracts },
+      { data: tenancyLinks },
     ] = await Promise.all([
       supabase
         .from("inspections")
@@ -105,8 +105,7 @@ export async function GET(request: NextRequest) {
         .from("documents")
         .select("*")
         .eq("user_id", user.id)
-        .eq("kind", "tenancy_contract")
-        .catch(() => ({ data: [], error: null })),
+        .eq("kind", "tenancy_contract"),
       supabase
         .from("tenancy_links")
         .select(`
@@ -121,8 +120,7 @@ export async function GET(request: NextRequest) {
             city
           )
         `)
-        .eq("tenant_id", user.id)
-        .catch(() => ({ data: [], error: null })),
+        .eq("tenant_id", user.id),
     ]);
 
     if (inspectionsError) {
@@ -133,9 +131,6 @@ export async function GET(request: NextRequest) {
         hint: inspectionsError.hint,
       });
     }
-
-    const contracts = (documentsRes as any)?.data || [];
-    const tenancyLinks = (tenancyLinksRes as any)?.data || [];
 
     // Map photo counts per property
     const inspectionMap = new Map<string, { move_in: number; move_out: number }>();
@@ -229,16 +224,16 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (!profile) {
-      await adminSupabase
+      const { error: profErr } = await adminSupabase
         .from("profiles")
         .insert({
           user_id: user.id,
           role: "tenant",
           display_name: input.tenant_name || null,
-        })
-        .catch((e) => {
-          console.error(`[${refId}] [POST /api/properties] Auto-create profile notice:`, e);
         });
+      if (profErr) {
+        console.error(`[${refId}] [POST /api/properties] Auto-create profile notice:`, profErr);
+      }
     }
 
     // Insert property with authenticated user ID

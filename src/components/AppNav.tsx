@@ -8,11 +8,13 @@ import { supabase } from "@/lib/supabase/client";
 interface AppNavProps {
   initialUser?: { email: string | null } | null;
   initialRole?: string | null;
+  initialIsDemo?: boolean;
 }
 
-export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) {
+export function AppNav({ initialUser = null, initialRole = null, initialIsDemo = false }: AppNavProps) {
   const [user, setUser] = useState<{ email: string | null } | null>(initialUser);
   const [role, setRole] = useState<string | null>(initialRole);
+  const [isDemo, setIsDemo] = useState<boolean>(initialIsDemo);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -20,7 +22,8 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
   useEffect(() => {
     setUser(initialUser);
     setRole(initialRole);
-  }, [initialUser, initialRole]);
+    setIsDemo(initialIsDemo);
+  }, [initialUser, initialRole, initialIsDemo]);
 
   useEffect(() => {
     const {
@@ -28,6 +31,7 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser({ email: session.user.email || null });
+        setIsDemo(Boolean(session.user.app_metadata?.is_demo));
         fetch("/api/profile")
           .then((r) => (r.ok ? r.json() : null))
           .then((body) => {
@@ -37,6 +41,7 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
       } else {
         setUser(null);
         setRole(null);
+        setIsDemo(false);
       }
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
         router.refresh();
@@ -50,6 +55,7 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
     await supabase.auth.signOut();
     setUser(null);
     setRole(null);
+    setIsDemo(false);
     router.push("/login");
     router.refresh();
   };
@@ -59,7 +65,8 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
   const isRegisterActive = isOwner ? pathname.startsWith("/owner") : pathname.startsWith("/properties");
 
   return (
-    <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
+    <>
+      <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
       <div className="max-w-[1400px] mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
         {/* Left Side: Brand Logo & Navigation Links */}
         <div className="flex items-center space-x-6">
@@ -179,5 +186,11 @@ export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) 
         </div>
       </div>
     </header>
+    {isDemo && (
+      <div className="bg-page border-b border-ink-200 py-1.5 px-4 text-center text-xs font-mono text-ink-600">
+        Demo account. All data and photos here are samples.
+      </div>
+    )}
+  </>
   );
 }

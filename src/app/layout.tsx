@@ -36,6 +36,7 @@ export default async function RootLayout({
 }>) {
   let userEmail: string | null = null;
   let userRole: UserRole | null = null;
+  let userIsDemo = false;
 
   try {
     const supabase = await createClient();
@@ -45,6 +46,7 @@ export default async function RootLayout({
 
     if (user) {
       userEmail = user.email || null;
+      userIsDemo = Boolean(user.app_metadata?.is_demo);
       const adminSupabase = createAdminClient();
       const { data: profile } = await adminSupabase
         .from("profiles")
@@ -64,6 +66,7 @@ export default async function RootLayout({
         <AppNav
           initialUser={userEmail ? { email: userEmail } : null}
           initialRole={userRole}
+          initialIsDemo={userIsDemo}
         />
         <div className="flex-1 flex flex-col">{children}</div>
         <AppFooter isAuthenticated={!!userEmail} userRole={userRole} />
