@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (profile && profile.role !== "owner") {
+    if (!profile || profile.role !== "owner") {
       return apiError("FORBIDDEN", "Only property owners can access owner condition reports", 403);
     }
 

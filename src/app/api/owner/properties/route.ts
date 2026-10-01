@@ -26,7 +26,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (profile && profile.role !== "owner") {
+    if (!profile || profile.role !== "owner") {
       return apiError("FORBIDDEN", "Only registered owner accounts can access this resource", 403);
     }
 
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (profile && profile.role !== "owner") {
+    if (!profile || profile.role !== "owner") {
       return apiError("FORBIDDEN", "Only registered owner accounts can register owner properties", 403);
     }
 
