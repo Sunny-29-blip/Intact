@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { api, ApiError } from "@/lib/api";
+import { SHOW_REGION_HINT_ON_SELECT } from "@/lib/config";
 import type {
   PhotoWithUrl,
   ComparisonWithFindings,
@@ -19,6 +20,21 @@ interface AreaComparisonCardProps {
   deletingPhotoId: string | null;
 }
 
+interface CalculatedMarker {
+  id: string;
+  index: number;
+  finding: Finding;
+  hasBox: boolean;
+  left: number;
+  top: number;
+  box?: {
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  };
+}
+
 export function AreaComparisonCard({
   propertyId,
   area,
@@ -33,13 +49,78 @@ export function AreaComparisonCard({
   const [comparing, setComparing] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
-  // Active highlighted finding
+  // Active highlighted / selected finding
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [hoveredFindingId, setHoveredFindingId] = useState<string | null>(null);
 
   // Dispute note editor state per finding
   const [editingDisputeId, setEditingDisputeId] = useState<string | null>(null);
   const [disputeNote, setDisputeNote] = useState("");
   const [updatingDecisionId, setUpdatingDecisionId] = useState<string | null>(null);
+
+  const findings = useMemo(() => comparison?.findings || [], [comparison]);
+  const isComplete = comparison?.status === "complete";
+  const isFailed = comparison?.status === "failed";
+
+  // Calculate centered numbered markers with collision avoidance
+  const markers = useMemo<CalculatedMarker[]>(() => {
+    const placed: CalculatedMarker[] = [];
+
+    findings.forEach((f, idx) => {
+      if (
+        f.box_ymin === null ||
+        f.box_xmin === null ||
+        f.box_ymax === null ||
+        f.box_xmax === null
+      ) {
+        placed.push({
+          id: f.id,
+          index: idx,
+          finding: f,
+          hasBox: false,
+          left: 0,
+          top: 0,
+        });
+        return;
+      }
+
+      const rawLeft = (f.box_xmin + f.box_xmax) / 2 / 10;
+      const rawTop = (f.box_ymin + f.box_ymax) / 2 / 10;
+
+      let left = Math.max(4, Math.min(96, rawLeft));
+      let top = Math.max(4, Math.min(96, rawTop));
+
+      // Nudge if too close to an existing marker (within ~5% in x and y)
+      for (const prev of placed) {
+        if (
+          prev.hasBox &&
+          Math.abs(prev.left - left) < 5 &&
+          Math.abs(prev.top - top) < 6
+        ) {
+          top = Math.min(96, top + 6.5);
+        }
+      }
+
+      const box = {
+        top: f.box_ymin / 10,
+        left: f.box_xmin / 10,
+        height: Math.max(2, (f.box_ymax - f.box_ymin) / 10),
+        width: Math.max(2, (f.box_xmax - f.box_xmin) / 10),
+      };
+
+      placed.push({
+        id: f.id,
+        index: idx,
+        finding: f,
+        hasBox: true,
+        left,
+        top,
+        box,
+      });
+    });
+
+    return placed;
+  }, [findings]);
 
   const handleRunComparison = async () => {
     if (!isPaired) return;
@@ -111,32 +192,31 @@ export function AreaComparisonCard({
     }
   };
 
-  const getClassificationBadge = (cls: string) => {
+  const getClassificationLabel = (cls: string) => {
     switch (cls) {
       case "damage":
-        return (
-          <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-damage-bg text-damage border border-damage-border">
-            DAMAGE
-          </span>
-        );
+        return "DAMAGE";
       case "wear":
-        return (
-          <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-wear-bg text-wear border border-wear-border">
-            NORMAL WEAR
-          </span>
-        );
+        return "NORMAL WEAR";
       default:
-        return (
-          <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-unclear-bg text-unclear border border-unclear-border">
-            UNCLEAR
-          </span>
-        );
+        return "UNCLEAR";
     }
   };
 
-  const findings = comparison?.findings || [];
-  const isComplete = comparison?.status === "complete";
-  const isFailed = comparison?.status === "failed";
+  const getMarkerStyle = (f: Finding, isLit: boolean) => {
+    const isDamage = f.classification === "damage";
+    const isWear = f.classification === "wear";
+
+    if (isLit) {
+      if (isDamage) return "bg-damage text-white border-2 border-damage";
+      if (isWear) return "bg-wear text-white border-2 border-wear";
+      return "bg-unclear text-white border-2 border-dashed border-unclear";
+    }
+
+    if (isDamage) return "bg-surface text-damage border-2 border-damage";
+    if (isWear) return "bg-surface text-wear border-2 border-wear";
+    return "bg-surface text-unclear border-2 border-dashed border-unclear";
+  };
 
   return (
     <div className="border border-ink-200 bg-surface p-4 sm:p-6 mb-6">
@@ -144,7 +224,7 @@ export function AreaComparisonCard({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-ink-200 pb-4 mb-4 gap-3">
         <div>
           <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
-            AREA SPECIMEN & COMPARISON
+            AREA RECORD & COMPARISON
           </div>
           <h3 className="text-base font-bold text-ink-900 mt-0.5">{area}</h3>
         </div>
@@ -154,15 +234,17 @@ export function AreaComparisonCard({
             <>
               {isComplete ? (
                 <button
+                  type="button"
                   onClick={handleRunComparison}
-                  className="px-3 py-1.5 text-xs font-mono font-medium text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-page transition-colors"
+                  className="px-3 py-1.5 text-xs font-mono font-medium text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-page transition-colors btn-motion lit"
                 >
                   ↻ Re-run Comparison
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleRunComparison}
-                  className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-accent hover:bg-accent-hover transition-colors"
+                  className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-accent hover:bg-accent-hover transition-colors btn-motion lit-dark"
                 >
                   Compare Area Photos
                 </button>
@@ -178,11 +260,37 @@ export function AreaComparisonCard({
         </div>
       </div>
 
-      {/* Comparing loading progress */}
+      {/* Comparing loading progress state (Phase 7 specification) */}
       {comparing && (
-        <div className="mb-6 p-4 bg-accent-tint border border-accent-border text-xs text-accent flex items-center space-x-3">
-          <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin flex-shrink-0" />
-          <span className="font-mono text-[11px]">Comparing photos — this takes about 10-20 seconds...</span>
+        <div className="mb-6 p-4 sm:p-5 bg-page border border-ink-200 text-xs">
+          <div className="flex items-center justify-between border-b border-ink-200 pb-2 mb-3">
+            <span className="font-mono text-[11px] uppercase font-bold text-accent tracking-wider">
+              COMPARING RECORDS
+            </span>
+            <span className="font-mono text-[10px] text-ink-500">
+              Processing inspection pair
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] font-mono text-ink-700 mb-2">
+            <span className="flex items-center space-x-2">
+              <span className="w-1.5 h-1.5 bg-accent inline-block"></span>
+              <span>MOVE-IN BASELINE</span>
+            </span>
+            <span className="text-ink-400">⟷</span>
+            <span className="flex items-center space-x-2">
+              <span>MOVE-OUT DEPARTURE</span>
+              <span className="w-1.5 h-1.5 bg-accent inline-block"></span>
+            </span>
+          </div>
+
+          <div className="w-full bg-ink-100 h-1 relative overflow-hidden mb-2">
+            <div className="absolute inset-y-0 left-0 bg-accent w-1/3 animate-pulse"></div>
+          </div>
+
+          <p className="text-ink-600 text-[11px] font-sans">
+            Comparing the two photos. This takes about 10 to 20 seconds.
+          </p>
         </div>
       )}
 
@@ -194,8 +302,9 @@ export function AreaComparisonCard({
             <div>{comparisonError || comparison?.error || "Comparison could not be completed."}</div>
           </div>
           <button
+            type="button"
             onClick={handleRunComparison}
-            className="underline font-mono text-xs text-accent font-semibold hover:text-accent-hover ml-4"
+            className="underline font-mono text-xs text-accent font-semibold hover:text-accent-hover ml-4 btn-motion"
           >
             Retry
           </button>
@@ -205,11 +314,12 @@ export function AreaComparisonCard({
       {/* Side-by-Side Photos Grid (Stacks vertically on mobile) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Move-In Baseline Photo (Left) */}
-        <div className="border border-ink-200 bg-page p-3 flex flex-col">
+        <div className="border border-ink-200 bg-page p-3 flex flex-col photo-frame lit">
           <div className="flex items-center justify-between text-xs font-mono font-semibold text-ink-700 mb-2">
             <span>IMAGE 1: MOVE-IN BASELINE</span>
             {moveInPhoto && (
               <button
+                type="button"
                 onClick={() => onDeletePhoto(moveInPhoto.id)}
                 disabled={deletingPhotoId === moveInPhoto.id}
                 className="text-[10px] font-mono text-damage hover:underline"
@@ -240,12 +350,13 @@ export function AreaComparisonCard({
           )}
         </div>
 
-        {/* Move-Out Departure Photo with Bounding Box Overlays (Right) */}
-        <div className="border border-ink-200 bg-page p-3 flex flex-col">
+        {/* Move-Out Departure Photo with Numbered Finding Markers (Right) */}
+        <div className="border border-ink-200 bg-page p-3 flex flex-col photo-frame lit">
           <div className="flex items-center justify-between text-xs font-mono font-semibold text-ink-700 mb-2">
             <span>IMAGE 2: MOVE-OUT DEPARTURE</span>
             {moveOutPhoto && (
               <button
+                type="button"
                 onClick={() => onDeletePhoto(moveOutPhoto.id)}
                 disabled={deletingPhotoId === moveOutPhoto.id}
                 className="text-[10px] font-mono text-damage hover:underline"
@@ -265,59 +376,54 @@ export function AreaComparisonCard({
                   loading="lazy"
                 />
 
-                {/* Numbered Bounding box overlays */}
-                {isComplete &&
-                  findings.map((f, idx) => {
-                    if (
-                      f.box_ymin === null ||
-                      f.box_xmin === null ||
-                      f.box_ymax === null ||
-                      f.box_xmax === null
-                    ) {
-                      return null;
-                    }
-
-                    const top = f.box_ymin / 10;
-                    const left = f.box_xmin / 10;
-                    const height = (f.box_ymax - f.box_ymin) / 10;
-                    const width = (f.box_xmax - f.box_xmin) / 10;
-                    const isSelected = selectedFindingId === f.id;
-
-                    // Color border rules: damage = solid muted red, wear = solid ochre, unclear = 2px dashed grey
-                    const boxStyle =
-                      f.classification === "damage"
-                        ? "border-2 border-damage bg-damage/15"
-                        : f.classification === "wear"
-                        ? "border-2 border-wear bg-wear/15"
-                        : "border-2 border-dashed border-unclear bg-unclear/15";
-
-                    const badgeBg =
-                      f.classification === "damage"
-                        ? "bg-damage text-white"
-                        : f.classification === "wear"
-                        ? "bg-wear text-white"
-                        : "bg-unclear text-white";
-
+                {/* Optional Faint Region Hint on explicit selection (Phase 4) */}
+                {SHOW_REGION_HINT_ON_SELECT &&
+                  isComplete &&
+                  markers.map((m) => {
+                    if (!m.hasBox || !m.box || selectedFindingId !== m.id) return null;
                     return (
                       <div
-                        key={f.id}
-                        onClick={() => setSelectedFindingId(f.id)}
+                        key={`hint-${m.id}`}
                         style={{
-                          top: `${top}%`,
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          height: `${height}%`,
+                          top: `${m.box.top}%`,
+                          left: `${m.box.left}%`,
+                          width: `${m.box.width}%`,
+                          height: `${m.box.height}%`,
                         }}
-                        className={`absolute transition-all cursor-pointer ${boxStyle} ${
-                          isSelected ? "ring-2 ring-ink-900 z-20" : "z-10"
-                        }`}
+                        className="absolute border border-dashed border-ink-700/45 pointer-events-none transition-opacity duration-300 z-10"
+                      />
+                    );
+                  })}
+
+                {/* Numbered Square Finding Markers (Phase 4) */}
+                {isComplete &&
+                  markers.map((m) => {
+                    if (!m.hasBox) return null;
+                    const isSelected = selectedFindingId === m.id;
+                    const isHovered = hoveredFindingId === m.id;
+                    const isLit = isSelected || isHovered;
+
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelectedFindingId(isSelected ? null : m.id)}
+                        onMouseEnter={() => setHoveredFindingId(m.id)}
+                        onMouseLeave={() => setHoveredFindingId(null)}
+                        onFocus={() => setHoveredFindingId(m.id)}
+                        onBlur={() => setHoveredFindingId(null)}
+                        aria-label={`Finding ${m.index + 1}: ${m.finding.description}`}
+                        style={{
+                          top: `${m.top}%`,
+                          left: `${m.left}%`,
+                          transform: `translate(-50%, -50%) ${isLit ? "scale(1.08)" : "scale(1)"}`,
+                        }}
+                        className={`absolute w-[24px] h-[24px] sm:w-[22px] sm:h-[22px] rounded-none flex items-center justify-center font-mono text-[11px] sm:text-[10px] font-bold shadow-none transition-transform duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent after:absolute after:-inset-2.5 after:content-[''] ${
+                          isLit ? "z-30" : "z-20"
+                        } ${getMarkerStyle(m.finding, isLit)}`}
                       >
-                        <span
-                          className={`absolute -top-2.5 -left-2.5 w-4 h-4 rounded-none flex items-center justify-center text-[9px] font-mono font-bold ${badgeBg}`}
-                        >
-                          {idx + 1}
-                        </span>
-                      </div>
+                        {m.index + 1}
+                      </button>
                     );
                   })}
               </div>
@@ -343,9 +449,7 @@ export function AreaComparisonCard({
             <strong className="font-mono text-[10px] uppercase text-ink-700 block mb-0.5">
               Confidence & Review Guidance:
             </strong>
-            Confidence is how sure the comparison is about the classification. It is
-            not a measure of how serious the finding is. Review each difference and
-            select whether you accept the description or dispute it with details.
+            Confidence is how sure the comparison is about the label. It is not a measure of how serious the finding is. Review each difference and select whether you accept the description or dispute it with details.
           </div>
 
           <div className="flex items-center justify-between mb-3">
@@ -354,7 +458,7 @@ export function AreaComparisonCard({
             </h4>
             {findings.length > 0 && (
               <span className="text-[11px] font-mono text-ink-500">
-                Click a finding to locate its box on the move-out photo
+                Click or hover a finding to link with photo marker
               </span>
             )}
           </div>
@@ -366,42 +470,76 @@ export function AreaComparisonCard({
               </span>
               <p>
                 Visual surfaces match the baseline move-in photo with no detectable
-                damage or excessive wear.
+                damage or excessive normal wear.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {findings.map((finding, idx) => {
                 const isSelected = selectedFindingId === finding.id;
+                const isHovered = hoveredFindingId === finding.id;
                 const isDisputeOpen = editingDisputeId === finding.id;
+                const hasNoBox =
+                  finding.box_ymin === null ||
+                  finding.box_xmin === null ||
+                  finding.box_ymax === null ||
+                  finding.box_xmax === null;
 
                 return (
                   <div
                     key={finding.id}
-                    onClick={() => setSelectedFindingId(finding.id)}
-                    className={`border p-4 transition-all text-xs cursor-pointer ${
+                    onClick={() => setSelectedFindingId(isSelected ? null : finding.id)}
+                    onMouseEnter={() => setHoveredFindingId(finding.id)}
+                    onMouseLeave={() => setHoveredFindingId(null)}
+                    onFocus={() => setHoveredFindingId(finding.id)}
+                    onBlur={() => setHoveredFindingId(null)}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        if (e.target === e.currentTarget) {
+                          e.preventDefault();
+                          setSelectedFindingId(isSelected ? null : finding.id);
+                        }
+                      }
+                    }}
+                    className={`border p-4 transition-all text-xs cursor-pointer interactive-row lit ${
                       isSelected
                         ? "border-ink-900 bg-surface ring-1 ring-ink-900"
-                        : "border-ink-200 bg-surface hover:border-ink-300"
+                        : isHovered
+                        ? "border-ink-400 bg-surface"
+                        : "border-ink-200 bg-surface"
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
                       <div className="flex items-start space-x-2.5">
-                        <span className="w-4 h-4 bg-ink-900 text-white flex items-center justify-center font-mono text-[9px] font-bold flex-shrink-0 mt-0.5">
+                        <span
+                          className={`w-[22px] h-[22px] flex items-center justify-center font-mono text-[10px] font-bold flex-shrink-0 mt-0.5 ${
+                            isSelected || isHovered
+                              ? finding.classification === "damage"
+                                ? "bg-damage text-white"
+                                : finding.classification === "wear"
+                                ? "bg-wear text-white"
+                                : "bg-unclear text-white"
+                              : "bg-ink-900 text-white"
+                          }`}
+                        >
                           {idx + 1}
                         </span>
                         <div>
                           <p className="font-semibold text-ink-900 text-sm">
                             {finding.description}
                           </p>
+
+                          {/* Formatted metadata mono line (Phase 4 requirement) */}
                           <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            {getClassificationBadge(finding.classification)}
-                            <span className="text-[10px] font-mono uppercase text-ink-600 px-1.5 py-0.5 bg-page border border-ink-200">
-                              {finding.severity} severity
+                            <span className="font-mono text-[11px] text-ink-700 uppercase font-semibold">
+                              {getClassificationLabel(finding.classification)} · {finding.severity} severity · {Math.round(finding.confidence * 100)}% confidence
                             </span>
-                            <span className="text-[10px] font-mono text-ink-500">
-                              {Math.round(finding.confidence * 100)}% confidence
-                            </span>
+                            {hasNoBox && (
+                              <span className="font-mono text-[10px] text-ink-500 bg-page px-1.5 py-0.5 border border-ink-200">
+                                Location not marked
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -420,7 +558,7 @@ export function AreaComparisonCard({
                         )}
                         {finding.decision === "pending" && (
                           <span className="px-2 py-0.5 text-[10px] font-mono text-ink-500 bg-page border border-ink-200">
-                            UNREVIEWED
+                            NOT REVIEWED
                           </span>
                         )}
                       </div>
@@ -428,7 +566,7 @@ export function AreaComparisonCard({
 
                     {/* Assessment Reasoning */}
                     {finding.reasoning && (
-                      <p className="text-ink-600 mt-2 pl-6 leading-relaxed bg-page p-2.5 border border-ink-100">
+                      <p className="text-ink-600 mt-2 pl-7 leading-relaxed bg-page p-2.5 border border-ink-100">
                         <strong className="text-ink-700 font-mono text-[10px] uppercase block mb-0.5">
                           Reasoning:
                         </strong>
@@ -438,7 +576,7 @@ export function AreaComparisonCard({
 
                     {/* Disputed note preview */}
                     {finding.decision === "disputed" && finding.decision_note && (
-                      <div className="mt-2 pl-6 text-[11px] text-disputed bg-disputed-bg p-2.5 border border-disputed-border">
+                      <div className="mt-2 pl-7 text-[11px] text-disputed bg-disputed-bg p-2.5 border border-disputed-border">
                         <strong>Tenant Dispute Note:</strong> {finding.decision_note}
                       </div>
                     )}
@@ -446,7 +584,7 @@ export function AreaComparisonCard({
                     {/* Tenant Review Decision Actions */}
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="mt-3 pl-6 pt-2.5 border-t border-ink-100 flex flex-wrap items-center justify-between gap-2"
+                      className="mt-3 pl-7 pt-2.5 border-t border-ink-100 flex flex-wrap items-center justify-between gap-2"
                     >
                       <span className="text-[10px] font-mono uppercase text-ink-500 font-medium">
                         Tenant Decision:
@@ -458,10 +596,10 @@ export function AreaComparisonCard({
                           aria-pressed={finding.decision === "accepted"}
                           onClick={() => handleDecision(finding, "accepted")}
                           disabled={updatingDecisionId === finding.id}
-                          className={`px-3 py-1 text-xs font-medium border transition-colors ${
+                          className={`px-3 py-1 text-xs font-medium border transition-colors btn-motion ${
                             finding.decision === "accepted"
                               ? "bg-accepted text-white border-accepted font-bold"
-                              : "border-ink-200 hover:border-accepted text-ink-700 bg-surface"
+                              : "border-ink-200 hover:border-accepted text-ink-700 bg-surface lit"
                           }`}
                         >
                           Accept
@@ -475,10 +613,10 @@ export function AreaComparisonCard({
                             setDisputeNote(finding.decision_note || "");
                           }}
                           disabled={updatingDecisionId === finding.id}
-                          className={`px-3 py-1 text-xs font-medium border transition-colors ${
+                          className={`px-3 py-1 text-xs font-medium border transition-colors btn-motion ${
                             finding.decision === "disputed"
                               ? "bg-disputed text-white border-disputed font-bold"
-                              : "border-ink-200 hover:border-disputed text-ink-700 bg-surface"
+                              : "border-ink-200 hover:border-disputed text-ink-700 bg-surface lit"
                           }`}
                         >
                           Dispute
@@ -490,7 +628,7 @@ export function AreaComparisonCard({
                     {isDisputeOpen && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="mt-3 pl-6 pt-3 border-t border-ink-100"
+                        className="mt-3 pl-7 pt-3 border-t border-ink-100"
                       >
                         <label className="block text-[11px] font-medium text-ink-700 mb-1">
                           Reason for Dispute (max 500 characters):
@@ -500,8 +638,8 @@ export function AreaComparisonCard({
                           onChange={(e) => setDisputeNote(e.target.value)}
                           maxLength={500}
                           rows={2}
-                          placeholder="State why this difference is preexisting, landlord-approved, or ordinary wear..."
-                          className="w-full p-2 border border-ink-200 text-xs bg-page focus:bg-surface focus:outline-none focus:border-accent"
+                          placeholder="State why this difference is preexisting, landlord-approved, or ordinary normal wear..."
+                          className="w-full p-2 border border-ink-200 text-xs bg-page focus:bg-surface focus:outline-none focus:border-accent font-sans"
                         />
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-[10px] font-mono text-ink-400">
@@ -511,7 +649,7 @@ export function AreaComparisonCard({
                             <button
                               type="button"
                               onClick={() => setEditingDisputeId(null)}
-                              className="px-2.5 py-1 text-xs text-ink-600 hover:text-ink-900 border border-ink-200 bg-surface"
+                              className="px-2.5 py-1 text-xs text-ink-600 hover:text-ink-900 border border-ink-200 bg-surface btn-motion lit"
                             >
                               Cancel
                             </button>
@@ -519,7 +657,7 @@ export function AreaComparisonCard({
                               type="button"
                               onClick={() => handleDecision(finding, "disputed", disputeNote)}
                               disabled={updatingDecisionId === finding.id}
-                              className="px-3 py-1 text-xs font-semibold bg-disputed text-white hover:opacity-90"
+                              className="px-3 py-1 text-xs font-semibold bg-disputed text-white hover:opacity-90 btn-motion lit"
                             >
                               Save Dispute
                             </button>
@@ -544,3 +682,4 @@ export function AreaComparisonCard({
     </div>
   );
 }
+
