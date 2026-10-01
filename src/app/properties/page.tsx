@@ -552,8 +552,8 @@ export default function PropertiesPage() {
             </div>
 
             {formErrors.general && (
-              <div className="mb-4 p-3 bg-damage-bg border border-damage-border text-xs text-damage font-mono">
-                [!] {formErrors.general}
+              <div className="mb-4 p-3 bg-page border border-ink-300 text-xs text-ink-800 font-mono">
+                {formErrors.general}
               </div>
             )}
 
