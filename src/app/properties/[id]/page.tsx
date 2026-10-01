@@ -260,6 +260,23 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
+  const handleDirectUpload = async (area: string, kind: "move_in" | "move_out", file: File) => {
+    if (!property || !userId) return;
+    const inspection = kind === "move_in" ? property.inspections.move_in : property.inspections.move_out;
+    if (!inspection) return;
+
+    await uploadAndRegisterPhoto({
+      userId,
+      propertyId,
+      inspectionId: inspection.id,
+      inspectionKind: kind,
+      area,
+      file,
+    });
+
+    await fetchPropertyAndComparisons();
+  };
+
   const handleDeletePhoto = async (photoId: string) => {
     if (!confirm("Are you sure you want to remove this inspection photo?")) {
       return;
@@ -756,6 +773,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                       onComparisonUpdated={handleComparisonUpdated}
                       onDeletePhoto={handleDeletePhoto}
                       deletingPhotoId={deletingPhotoId}
+                      onDirectUpload={handleDirectUpload}
                     />
                   );
                 })}

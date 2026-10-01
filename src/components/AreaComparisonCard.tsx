@@ -18,6 +18,7 @@ interface AreaComparisonCardProps {
   onComparisonUpdated: (updated: ComparisonWithFindings) => void;
   onDeletePhoto: (photoId: string) => void;
   deletingPhotoId: string | null;
+  onDirectUpload?: (area: string, kind: "move_in" | "move_out", file: File) => Promise<void>;
 }
 
 interface CalculatedMarker {
@@ -44,10 +45,12 @@ export function AreaComparisonCard({
   onComparisonUpdated,
   onDeletePhoto,
   deletingPhotoId,
+  onDirectUpload,
 }: AreaComparisonCardProps) {
   const isPaired = Boolean(moveInPhoto && moveOutPhoto);
   const [comparing, setComparing] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [localUploading, setLocalUploading] = useState<"move_in" | "move_out" | null>(null);
 
   // Active highlighted / selected finding
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
@@ -57,6 +60,18 @@ export function AreaComparisonCard({
   const [editingDisputeId, setEditingDisputeId] = useState<string | null>(null);
   const [disputeNote, setDisputeNote] = useState("");
   const [updatingDecisionId, setUpdatingDecisionId] = useState<string | null>(null);
+
+  const handleFilePicked = async (kind: "move_in" | "move_out", file: File) => {
+    if (!onDirectUpload) return;
+    setLocalUploading(kind);
+    try {
+      await onDirectUpload(area, kind, file);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLocalUploading(null);
+    }
+  };
 
   const findings = useMemo(() => comparison?.findings || [], [comparison]);
   const isComplete = comparison?.status === "complete";
@@ -316,7 +331,18 @@ export function AreaComparisonCard({
         {/* Move-In Baseline Photo (Left) */}
         <div className="border border-ink-200 bg-page p-3 flex flex-col photo-frame lit">
           <div className="flex items-center justify-between text-xs font-mono font-semibold text-ink-700 mb-2">
-            <span>IMAGE 1: MOVE-IN BASELINE</span>
+            <div className="flex items-center space-x-2">
+              <span>MOVE-IN BASELINE</span>
+              {moveInPhoto ? (
+                <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold bg-accepted-bg text-accepted border border-accepted-border">
+                  PHOTO RECORDED
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold bg-wear-bg text-wear border border-wear-border">
+                  PHOTO NEEDED
+                </span>
+              )}
+            </div>
             {moveInPhoto && (
               <button
                 type="button"
@@ -329,18 +355,38 @@ export function AreaComparisonCard({
             )}
           </div>
 
-          <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden">
-            {moveInPhoto?.signed_url ? (
+          {moveInPhoto?.signed_url ? (
+            <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden">
               <img
                 src={moveInPhoto.signed_url}
                 alt={`Move-in ${area}`}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
-            ) : (
-              <span className="text-xs text-ink-400 font-mono">Missing baseline photo</span>
-            )}
-          </div>
+            </div>
+          ) : (
+            <label className="aspect-[4/3] bg-surface border-2 border-dashed border-ink-300 hover:border-accent relative flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center group">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={localUploading === "move_in"}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFilePicked("move_in", file);
+                }}
+              />
+              <div className="w-10 h-10 border border-ink-200 group-hover:border-accent text-ink-400 group-hover:text-accent flex items-center justify-center mb-2 font-mono text-base transition-colors bg-page">
+                {localUploading === "move_in" ? "…" : "+"}
+              </div>
+              <span className="font-mono text-xs font-bold text-ink-800 uppercase tracking-wider group-hover:text-accent transition-colors">
+                {localUploading === "move_in" ? "UPLOADING PHOTO..." : "UPLOAD MOVE-IN PHOTOGRAPH"}
+              </span>
+              <span className="text-[10px] font-mono text-ink-500 mt-1">
+                Click to record arrival baseline photo
+              </span>
+            </label>
+          )}
 
           {moveInPhoto && (
             <div className="mt-2 text-[10px] font-mono text-ink-500 flex justify-between">
@@ -350,10 +396,21 @@ export function AreaComparisonCard({
           )}
         </div>
 
-        {/* Move-Out Departure Photo with Numbered Finding Markers (Right) */}
+        {/* Move-Out Departure Photo (Right) */}
         <div className="border border-ink-200 bg-page p-3 flex flex-col photo-frame lit">
           <div className="flex items-center justify-between text-xs font-mono font-semibold text-ink-700 mb-2">
-            <span>IMAGE 2: MOVE-OUT DEPARTURE</span>
+            <div className="flex items-center space-x-2">
+              <span>MOVE-OUT DEPARTURE</span>
+              {moveOutPhoto ? (
+                <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold bg-accepted-bg text-accepted border border-accepted-border">
+                  PHOTO RECORDED
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 text-[9px] uppercase font-bold bg-wear-bg text-wear border border-wear-border">
+                  PHOTO NEEDED
+                </span>
+              )}
+            </div>
             {moveOutPhoto && (
               <button
                 type="button"
@@ -366,8 +423,8 @@ export function AreaComparisonCard({
             )}
           </div>
 
-          <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden">
-            {moveOutPhoto?.signed_url ? (
+          {moveOutPhoto?.signed_url ? (
+            <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden">
               <div className="relative w-full h-full">
                 <img
                   src={moveOutPhoto.signed_url}
@@ -376,7 +433,7 @@ export function AreaComparisonCard({
                   loading="lazy"
                 />
 
-                {/* Optional Faint Region Hint on explicit selection (Phase 4) */}
+                {/* Optional Faint Region Hint on explicit selection */}
                 {SHOW_REGION_HINT_ON_SELECT &&
                   isComplete &&
                   markers.map((m) => {
@@ -395,7 +452,7 @@ export function AreaComparisonCard({
                     );
                   })}
 
-                {/* Numbered Square Finding Markers (Phase 4) */}
+                {/* Numbered Square Finding Markers */}
                 {isComplete &&
                   markers.map((m) => {
                     if (!m.hasBox) return null;
@@ -427,10 +484,30 @@ export function AreaComparisonCard({
                     );
                   })}
               </div>
-            ) : (
-              <span className="text-xs text-ink-400 font-mono">Departure photo pending</span>
-            )}
-          </div>
+            </div>
+          ) : (
+            <label className="aspect-[4/3] bg-surface border-2 border-dashed border-ink-300 hover:border-accent relative flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center group">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={localUploading === "move_out"}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFilePicked("move_out", file);
+                }}
+              />
+              <div className="w-10 h-10 border border-ink-200 group-hover:border-accent text-ink-400 group-hover:text-accent flex items-center justify-center mb-2 font-mono text-base transition-colors bg-page">
+                {localUploading === "move_out" ? "…" : "+"}
+              </div>
+              <span className="font-mono text-xs font-bold text-ink-800 uppercase tracking-wider group-hover:text-accent transition-colors">
+                {localUploading === "move_out" ? "UPLOADING PHOTO..." : "UPLOAD MOVE-OUT PHOTOGRAPH"}
+              </span>
+              <span className="text-[10px] font-mono text-ink-500 mt-1">
+                Click to record departure verification photo
+              </span>
+            </label>
+          )}
 
           {moveOutPhoto && (
             <div className="mt-2 text-[10px] font-mono text-ink-500 flex justify-between">

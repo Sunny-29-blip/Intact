@@ -219,12 +219,12 @@ export default function SignupPage() {
           </form>
 
           <div className="mt-6 pt-4 border-t border-ink-100 flex items-center justify-between text-xs">
-            <span className="text-ink-600">Already have a record?</span>
+            <span className="text-ink-600">Existing account?</span>
             <Link
               href="/login"
               className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase"
             >
-              Log in to register →
+              I already have a record →
             </Link>
           </div>
 

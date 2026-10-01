@@ -9,7 +9,8 @@ import { authSchema } from "@/lib/validation";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/properties";
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/properties";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

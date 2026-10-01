@@ -33,10 +33,7 @@ export function AppNav() {
     router.refresh();
   };
 
-  // Hide nav on standalone inspection report pages
-  if (pathname.startsWith("/report/")) {
-    return null;
-  }
+
 
   return (
     <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">

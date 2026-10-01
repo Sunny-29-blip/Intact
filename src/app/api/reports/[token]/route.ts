@@ -21,14 +21,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const adminSupabase = createAdminClient();
 
-    // 1. Fetch property by share_token
-    const { data: property, error: propError } = await adminSupabase
-      .from("properties")
-      .select("*")
-      .eq("share_token", token)
-      .single();
+    // 1. Fetch property by share_token or id
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+    let property = null;
 
-    if (propError || !property) {
+    if (isUuid) {
+      const { data: propById } = await adminSupabase
+        .from("properties")
+        .select("*")
+        .eq("id", token)
+        .maybeSingle();
+      property = propById;
+    }
+
+    if (!property) {
+      const { data: propByToken } = await adminSupabase
+        .from("properties")
+        .select("*")
+        .eq("share_token", token)
+        .maybeSingle();
+      property = propByToken;
+    }
+
+    if (!property) {
       return apiError("NOT_FOUND", "Inspection report not found or invalid token", 404);
     }
 
