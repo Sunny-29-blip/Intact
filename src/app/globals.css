@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-light-in: 380ms;
+  --dur-light-out: 560ms;
+  --dur-ui: 200ms;
+  --dur-reveal: 560ms;
+  --stagger: 70ms;
+}
+
 @layer base {
   body {
     background-color: #F4F5F7;
@@ -20,6 +29,29 @@
   }
 }
 
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+    transform: none !important;
+  }
+  .reveal-up,
+  .reveal-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .lit::before,
+  .lit-dark::before,
+  .lit-paper::before {
+    display: none !important;
+  }
+}
+
 /* Print stylesheets for read-only inspection reports */
 @media print {
   body {
@@ -33,5 +65,12 @@
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
   }
 }

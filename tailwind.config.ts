@@ -69,6 +69,29 @@ const config: Config = {
         none: "none",
         subtle: "0 1px 1px 0 rgba(0, 0, 0, 0.04)",
       },
+      transitionTimingFunction: {
+        soft: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+      transitionDuration: {
+        "light-in": "380ms",
+        "light-out": "560ms",
+        ui: "200ms",
+        reveal: "560ms",
+      },
+      keyframes: {
+        revealUp: {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+      },
+      animation: {
+        "reveal-up": "revealUp 560ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in": "fadeIn 400ms cubic-bezier(0.22, 1, 0.36, 1) both",
+      },
     },
   },
   plugins: [],
