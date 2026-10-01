@@ -44,14 +44,18 @@ export async function GET() {
 
     const propertyIds = (properties || []).map((p) => p.id);
 
-    // Fetch linked tenants count and document counts for these properties
-    let linkCounts: Record<string, number> = {};
+    // Fetch linked tenants and evidence document counts
     let docCounts: Record<string, number> = {};
+    let tenantsByProperty: Record<string, any[]> = {};
+
     if (propertyIds.length > 0) {
-      const [{ data: links }, { data: docs }] = await Promise.all([
+      const [
+        { data: links },
+        { data: docs },
+      ] = await Promise.all([
         adminSupabase
           .from("tenancy_links")
-          .select("owner_property_id")
+          .select("id, owner_property_id, tenant_id, tenant_property_id, shared, created_at")
           .in("owner_property_id", propertyIds),
         adminSupabase
           .from("documents")
@@ -60,22 +64,123 @@ export async function GET() {
           .in("owner_property_id", propertyIds),
       ]);
 
-      (links || []).forEach((link) => {
-        linkCounts[link.owner_property_id] = (linkCounts[link.owner_property_id] || 0) + 1;
-      });
-
       (docs || []).forEach((doc) => {
         if (doc.owner_property_id) {
           docCounts[doc.owner_property_id] = (docCounts[doc.owner_property_id] || 0) + 1;
         }
       });
+
+      const tenantIds = Array.from(new Set((links || []).map((l) => l.tenant_id)));
+      const tenantPropIds = Array.from(new Set((links || []).map((l) => l.tenant_property_id)));
+
+      let profilesMap: Record<string, string> = {};
+      let tenantPropsMap: Record<string, any> = {};
+      let comparisonsMap: Record<string, { areas: number; findings: number; hasPhotos: boolean }> = {};
+
+      if (tenantIds.length > 0) {
+        const { data: profiles } = await adminSupabase
+          .from("profiles")
+          .select("user_id, display_name")
+          .in("user_id", tenantIds);
+
+        (profiles || []).forEach((p) => {
+          if (p.display_name) profilesMap[p.user_id] = p.display_name;
+        });
+      }
+
+      if (tenantPropIds.length > 0) {
+        const [
+          { data: tenantProps },
+          { data: comps },
+          { data: photos },
+          { data: findings },
+        ] = await Promise.all([
+          adminSupabase
+            .from("properties")
+            .select("id, name, tenant_name, tenancy_start, tenancy_end")
+            .in("id", tenantPropIds),
+          adminSupabase
+            .from("comparisons")
+            .select("id, property_id, area")
+            .in("property_id", tenantPropIds),
+          adminSupabase
+            .from("photos")
+            .select("id, property_id:inspections(property_id)")
+            .in("inspections.property_id", tenantPropIds),
+          adminSupabase
+            .from("findings")
+            .select("id, comparison_id, comparisons(property_id)")
+            .limit(500),
+        ]);
+
+        (tenantProps || []).forEach((tp) => {
+          tenantPropsMap[tp.id] = tp;
+        });
+
+        // Compute summary counts per tenant property
+        (tenantPropIds || []).forEach((propId) => {
+          const propComps = (comps || []).filter((c) => c.property_id === propId);
+          const distinctAreas = new Set(propComps.map((c) => c.area)).size;
+          const propFindings = (findings || []).filter(
+            (f: any) => f.comparisons && f.comparisons.property_id === propId
+          );
+          comparisonsMap[propId] = {
+            areas: distinctAreas,
+            findings: propFindings.length,
+            hasPhotos: (photos || []).length > 0,
+          };
+        });
+      }
+
+      (links || []).forEach((link) => {
+        const tp = tenantPropsMap[link.tenant_property_id] || {};
+        const stats = comparisonsMap[link.tenant_property_id] || { areas: 0, findings: 0, hasPhotos: false };
+        const displayName = tp.tenant_name || profilesMap[link.tenant_id] || "Tenant";
+
+        let reportStatus = "Not shared";
+        if (!stats.hasPhotos && stats.areas === 0) {
+          reportStatus = "Not started";
+        } else if (link.shared) {
+          const areaWord = stats.areas === 1 ? "area" : "areas";
+          const findingWord = stats.findings === 1 ? "finding" : "findings";
+          reportStatus = `Shared: ${stats.areas} ${areaWord}, ${stats.findings} ${findingWord}`;
+        }
+
+        // Strictly whitelisted fields only
+        const whitelistedTenant = {
+          link_id: link.id,
+          tenant_name: displayName,
+          tenancy_start: tp.tenancy_start || "—",
+          tenancy_end: tp.tenancy_end || null,
+          shared: link.shared,
+          report_status: reportStatus,
+          areas_count: stats.areas,
+          findings_count: stats.findings,
+        };
+
+        if (!tenantsByProperty[link.owner_property_id]) {
+          tenantsByProperty[link.owner_property_id] = [];
+        }
+        tenantsByProperty[link.owner_property_id].push(whitelistedTenant);
+      });
+
+      // Sort tenants by soonest contract end
+      Object.keys(tenantsByProperty).forEach((key) => {
+        tenantsByProperty[key].sort((a, b) => {
+          if (!a.tenancy_end) return 1;
+          if (!b.tenancy_end) return -1;
+          return a.tenancy_end.localeCompare(b.tenancy_end);
+        });
+      });
     }
 
-    const propertiesWithCount: OwnerProperty[] = (properties || []).map((p) => {
+    const propertiesWithCount: any[] = (properties || []).map((p) => {
       const count = docCounts[p.id] || 0;
+      const linkedTenants = tenantsByProperty[p.id] || [];
       return {
         ...p,
-        linked_tenants_count: linkCounts[p.id] || 0,
+        linked_tenants_count: linkedTenants.length,
+        linked_tenants: linkedTenants,
         documents_count: count,
         documents_missing: count === 0,
       };

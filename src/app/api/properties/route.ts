@@ -37,8 +37,12 @@ export async function GET(request: NextRequest) {
       return apiError("DB_ERROR", "Failed to fetch properties", 500);
     }
 
-    // Fetch inspections with photo counts and tenancy contracts
-    const [{ data: inspections, error: inspectionsError }, { data: contracts }] = await Promise.all([
+    // Fetch inspections with photo counts, tenancy contracts, and tenancy links
+    const [
+      { data: inspections, error: inspectionsError },
+      { data: contracts },
+      { data: tenancyLinks },
+    ] = await Promise.all([
       supabase
         .from("inspections")
         .select("id, property_id, kind, photos(count)")
@@ -48,6 +52,21 @@ export async function GET(request: NextRequest) {
         .select("*")
         .eq("user_id", user.id)
         .eq("kind", "tenancy_contract"),
+      supabase
+        .from("tenancy_links")
+        .select(`
+          id,
+          tenant_property_id,
+          owner_property_id,
+          shared,
+          owner_properties (
+            id,
+            name,
+            address,
+            city
+          )
+        `)
+        .eq("tenant_id", user.id),
     ]);
 
     if (inspectionsError) {
@@ -71,15 +90,29 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    const linksMap = new Map<string, any>();
+    (tenancyLinks || []).forEach((link: any) => {
+      if (link.tenant_property_id) {
+        linksMap.set(link.tenant_property_id, {
+          link_id: link.id,
+          owner_property_id: link.owner_property_id,
+          name: link.owner_properties?.name || "Owner Property",
+          shared: link.shared,
+        });
+      }
+    });
+
     const enrichedProperties: PropertyListItem[] = (properties || []).map((prop) => {
       const counts = inspectionMap.get(prop.id) || { move_in: 0, move_out: 0 };
       const contract = contractsMap.get(prop.id) || null;
+      const linkedOwner = linksMap.get(prop.id) || null;
       return {
         ...prop,
         move_in_count: counts.move_in,
         move_out_count: counts.move_out,
         contract,
         documents_missing: !contract,
+        linked_owner_property: linkedOwner,
       };
     });
 

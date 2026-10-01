@@ -178,6 +178,12 @@ export interface PropertyDetail extends Property {
 export interface PropertyListItem extends Property {
   move_in_count: number;
   move_out_count: number;
+  linked_owner_property?: {
+    link_id: string;
+    owner_property_id: string;
+    name: string;
+    shared: boolean;
+  } | null;
 }
 
 export interface ApiResponse<T> {

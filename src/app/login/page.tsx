@@ -24,10 +24,12 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setErrors({});
     setRoleNotice(null);
 
-    const validation = authSchema.safeParse({ email, password });
+    const trimmedEmail = email.trim();
+    const validation = authSchema.safeParse({ email: trimmedEmail, password });
     if (!validation.success) {
       const fieldErrors = validation.error.flatten().fieldErrors;
       setErrors({
@@ -40,13 +42,22 @@ function LoginForm() {
     setLoading(true);
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
       });
 
       if (authError) {
-        setErrors({ general: authError.message || "Invalid email or password." });
         setLoading(false);
+        const errorMsg = (authError.message || "").toLowerCase();
+        const status = (authError as { status?: number }).status;
+        if (status === 429 || errorMsg.includes("rate limit") || errorMsg.includes("too many requests")) {
+          setErrors({ general: "Too many attempts. Wait a minute and try again." });
+        } else {
+          // Never reveal if email exists or password was wrong
+          setErrors({
+            general: "We couldn't find an account with that email and password. Check them, or create an account.",
+          });
+        }
         return;
       }
 
@@ -55,30 +66,14 @@ function LoginForm() {
       const userRole = profile.role || "tenant";
 
       if (userRole === "owner") {
-        if (activeTab === "tenant") {
-          setRoleNotice("This is an owner account. Opening your owner dashboard.");
-          setTimeout(() => {
-            router.push("/owner");
-            router.refresh();
-          }, 1000);
-        } else {
-          router.push("/owner");
-          router.refresh();
-        }
+        router.push("/owner");
+        router.refresh();
       } else {
-        if (activeTab === "owner") {
-          setRoleNotice("This is a tenant account. Opening your tenant dashboard.");
-          setTimeout(() => {
-            router.push(nextPath || "/properties");
-            router.refresh();
-          }, 1000);
-        } else {
-          router.push(nextPath || "/properties");
-          router.refresh();
-        }
+        router.push(nextPath || "/properties");
+        router.refresh();
       }
     } catch {
-      setErrors({ general: "An unexpected network error occurred. Please try again." });
+      setErrors({ general: "A network error occurred. Please try again." });
       setLoading(false);
     }
   };
@@ -134,8 +129,16 @@ function LoginForm() {
         )}
 
         {errors.general && (
-          <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage">
-            {errors.general}
+          <div className="mb-5 p-3 text-xs bg-page border border-ink-300 text-ink-800 flex items-center justify-between gap-3">
+            <span>{errors.general}</span>
+            {errors.general.includes("create an account") && (
+              <Link
+                href={`/signup${activeTab === "owner" ? "?role=owner" : ""}`}
+                className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase whitespace-nowrap"
+              >
+                Create account →
+              </Link>
+            )}
           </div>
         )}
 

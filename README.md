@@ -14,9 +14,18 @@ Tenants frequently face unfair security deposit deductions at move-out due to su
 - **Schema Validation**: Zod
 - **Deployment**: Vercel
 
-## Architecture
+## Backend Architecture & API
 
-Intact uses a secure server-centric architecture. Tenant interactions (managing properties, uploading move-in/move-out photos, initiating comparisons) are executed via authenticated Next.js Server Actions and Route Handlers governed by PostgreSQL Row Level Security (RLS) policies. Photos are stored securely in a private Supabase Storage bucket with strict user-scoped access rules. When comparisons are triggered, a server-only worker fetches the matching move-in and move-out photos, calculates visual diffs using Google Gemini with structured JSON output, and persists normalized bounding-box findings. Read-only landlord reports are served via unique, unguessable share tokens accessed through privileged server clients without exposing private user accounts.
+The Intact backend is built on Supabase (PostgreSQL with Row Level Security, Auth, and Storage) and Next.js 15 Server Route Handlers. All multimodal AI comparisons are executed server-side via Google Gemini (`gemini-2.5-flash`).
+
+### Core Backend Capabilities
+- **Authentication & Roles**: Email/password authentication via Supabase Auth. User profiles determine role (`tenant` or `owner`). Middleware enforces route protection, unauthenticated redirects, and role isolation.
+- **Contract Status Engine**: Shared helper (`lib/contract-status.ts`) calculates calendar-accurate tenancy duration ("Active", "Ends in N days", "Ended") without timezone drift.
+- **Two-Photo Report Pipeline**: Move-in baseline and move-out departure photographs are resized in-browser, SHA-256 hashed, uploaded to private storage, and compared on the server with Gemini structured JSON output and Zod validation. Findings and tenant review decisions (Accepted / Rejected / Not reviewed) persist directly in Postgres.
+- **Owner & Tenant Dashboards**: Tenants control private condition records and toggle report sharing per property. Owners manage join codes and access read-only condition reports (`/owner/reports/[linkId]`) only when shared by the tenant.
+- **Security Boundaries**: Private storage buckets, server-only secret keys and Gemini tokens, time-limited signed URLs, and strict RLS policies.
+
+For complete backend architecture, database schemas, and API documentation, see [`docs/backend.md`](docs/backend.md).
 
 ## Roles & Workflows
 

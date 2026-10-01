@@ -49,8 +49,9 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
+      const trimmedEmail = email.trim();
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
         options: {
           data: {
@@ -60,8 +61,28 @@ export default function SignupPage() {
       });
 
       if (error) {
-        setErrors({ general: error.message || "Failed to create account." });
         setLoading(false);
+        const errorMsg = (error.message || "").toLowerCase();
+        if (
+          errorMsg.includes("already registered") ||
+          errorMsg.includes("already exists") ||
+          (error as { code?: string }).code === "user_already_exists"
+        ) {
+          setErrors({
+            general: "An account with this email already exists. Log in instead.",
+          });
+        } else {
+          setErrors({ general: error.message || "Failed to create account." });
+        }
+        return;
+      }
+
+      // Supabase returns identities: [] when email exists and email confirmation is enabled
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setLoading(false);
+        setErrors({
+          general: "An account with this email already exists. Log in instead.",
+        });
         return;
       }
 
@@ -82,12 +103,12 @@ export default function SignupPage() {
         router.refresh();
       } else {
         setSuccessNotice(
-          "Account created successfully. You can now log in below."
+          "Check your email for the confirmation link to complete your registration."
         );
         setLoading(false);
       }
     } catch {
-      setErrors({ general: "An unexpected network error occurred. Please try again." });
+      setErrors({ general: "A network error occurred. Please try again." });
       setLoading(false);
     }
   };
@@ -146,13 +167,21 @@ export default function SignupPage() {
           </div>
 
           {errors.general && (
-            <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage">
-              {errors.general}
+            <div className="mb-5 p-3 text-xs bg-page border border-ink-300 text-ink-800 flex items-center justify-between gap-3">
+              <span>{errors.general}</span>
+              {errors.general.includes("Log in instead") && (
+                <Link
+                  href="/login"
+                  className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase whitespace-nowrap"
+                >
+                  Log in →
+                </Link>
+              )}
             </div>
           )}
 
           {successNotice && (
-            <div className="mb-5 p-3 text-xs bg-accepted-bg border border-accepted-border text-accepted font-medium">
+            <div className="mb-5 p-3 text-xs bg-page border border-accent-border text-ink-800 font-mono">
               {successNotice}
             </div>
           )}

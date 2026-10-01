@@ -51,9 +51,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // If user is already logged in and visits /login or /signup, redirect to their role home
+  if (user && (pathname === "/login" || pathname === "/signup")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const userRole = profile?.role || "tenant";
+    const url = request.nextUrl.clone();
+    url.pathname = userRole === "owner" ? "/owner" : "/properties";
+    return NextResponse.redirect(url);
+  }
+
   // Role-based route guards for authenticated sessions
   if (user && !pathname.startsWith("/api")) {
-    // If accessing role-specific routes, check profile role
     if (pathname.startsWith("/properties") || pathname.startsWith("/owner")) {
       const { data: profile } = await supabase
         .from("profiles")

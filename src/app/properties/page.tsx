@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { api, ApiError } from "@/lib/api";
 import { uploadAndRegisterDocument } from "@/lib/client-document";
 import { createPropertySchema } from "@/lib/validation";
+import { getContractStatus } from "@/lib/contract-status";
 import type { PropertyListItem } from "@/types/database";
 
 const ALLOWED_MIMES = [
@@ -35,6 +36,7 @@ export default function PropertiesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [createdPropertyId, setCreatedPropertyId] = useState<string | null>(null);
+  const [updatingShareId, setUpdatingShareId] = useState<string | null>(null);
 
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -72,6 +74,18 @@ export default function PropertiesPage() {
   useEffect(() => {
     fetchProperties();
   }, []);
+
+  const handleToggleShare = async (linkId: string, currentShared: boolean) => {
+    setUpdatingShareId(linkId);
+    try {
+      await api.updateLinkShare(linkId, !currentShared);
+      await fetchProperties();
+    } catch (err) {
+      console.error("Failed to toggle share:", err);
+    } finally {
+      setUpdatingShareId(null);
+    }
+  };
 
   const openCreateModal = () => {
     setFormErrors({});
@@ -215,17 +229,17 @@ export default function PropertiesPage() {
     tenancyEnd > tenancyStart &&
     contractFile !== null;
 
-  const getTenancyStatus = (prop: PropertyListItem) => {
+  const getReportStatus = (prop: PropertyListItem) => {
     if (prop.move_in_count === 0) {
-      return { label: "NO PHOTOS", style: "bg-page text-ink-500 border-ink-200" };
+      return { label: "No photos", style: "bg-page text-ink-500 border-ink-200" };
     }
     if (prop.move_out_count === 0) {
-      return { label: "MOVE-IN RECORDED", style: "bg-accent-tint text-accent border-accent-border" };
+      return { label: "Move-in recorded", style: "bg-accent-tint text-accent border-accent-border" };
     }
     if (prop.move_out_count < prop.move_in_count) {
-      return { label: "IN REVIEW", style: "bg-wear-bg text-wear border-wear-border" };
+      return { label: "In review", style: "bg-wear-bg text-wear border-wear-border" };
     }
-    return { label: "REPORT READY", style: "bg-accepted-bg text-accepted border-accepted-border" };
+    return { label: "Report ready", style: "bg-accepted-bg text-accepted border-accepted-border" };
   };
 
   const getPropertyRef = (id: string) => {
@@ -244,7 +258,7 @@ export default function PropertiesPage() {
             SECTION 01 · REGISTER
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900 mt-1">
-            Inspection Register
+            Tenant Inspection Register
           </h1>
           <div className="flex items-center gap-3 mt-1 text-xs text-ink-600 font-mono">
             <span>
@@ -266,11 +280,11 @@ export default function PropertiesPage() {
 
       {/* Error state */}
       {error && (
-        <div className="mb-6 p-4 bg-damage-bg border border-damage-border text-xs text-damage flex items-center justify-between font-mono">
-          <span>[!] {error}</span>
+        <div className="mb-6 p-4 bg-page border border-ink-300 text-xs text-ink-800 flex items-center justify-between font-mono">
+          <span>{error}</span>
           <button
             onClick={fetchProperties}
-            className="underline font-semibold hover:text-damage ml-4 btn-motion"
+            className="underline font-semibold hover:text-accent ml-4 btn-motion"
           >
             Retry
           </button>
@@ -293,122 +307,205 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* First-time empty state: 3 steps */}
       {!loading && !error && properties.length === 0 && (
-        <div className="border border-ink-200 bg-surface p-10 sm:p-16 text-center max-w-xl mx-auto my-8">
-          <div className="w-8 h-8 border border-ink-200 bg-page mx-auto flex items-center justify-center text-ink-500 font-mono text-xs mb-3">
-            00
+        <div className="border border-ink-200 bg-surface p-8 sm:p-12 max-w-2xl mx-auto my-8">
+          <div className="border-b border-ink-200 pb-4 mb-6 text-center">
+            <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+              WELCOME TO INTACT
+            </div>
+            <h2 className="text-xl font-bold text-ink-900 mt-1">
+              Start your inspection record in three steps
+            </h2>
+            <p className="text-xs text-ink-600 mt-1">
+              Create an immutable record of your property condition before unpacking.
+            </p>
           </div>
-          <div className="text-[10px] font-mono uppercase text-ink-500 mb-1">
-            REGISTER EMPTY
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 01</div>
+              <div className="text-xs font-bold text-ink-900">Add your flat or house</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Enter your property name and address to create a dedicated record book.
+              </div>
+            </div>
+
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 02</div>
+              <div className="text-xs font-bold text-ink-900">Add your contract</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Upload your tenancy agreement to anchor dates and establish baseline terms.
+              </div>
+            </div>
+
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 03</div>
+              <div className="text-xs font-bold text-ink-900">Run a report</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Drop baseline move-in photos and compare them when moving out with Gemini.
+              </div>
+            </div>
           </div>
-          <h2 className="text-lg font-bold text-ink-900 mb-2">
-            No Properties Recorded Yet
-          </h2>
-          <p className="text-xs text-ink-600 leading-relaxed mb-6 max-w-md mx-auto">
-            Open an inspection record with your tenancy contract before unpacking. You will catalog baseline move-in photos by area and pair departure photos when moving out.
-          </p>
-          <button
-            onClick={openCreateModal}
-            className="px-5 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark min-h-[48px] sm:min-h-0"
-          >
-            + Add property
-          </button>
+
+          <div className="text-center">
+            <button
+              onClick={openCreateModal}
+              className="px-6 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark"
+            >
+              + Add your flat or house
+            </button>
+          </div>
         </div>
       )}
 
       {/* Structured Register Table */}
       {!loading && !error && properties.length > 0 && (
-        <div className="border border-ink-200 bg-surface overflow-x-auto mb-8">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-ink-200 bg-page text-[10px] font-mono uppercase text-ink-500 tracking-wider">
-                <th className="py-3 px-4 font-semibold">REF</th>
-                <th className="py-3 px-4 font-semibold">PROPERTY & LOCATION</th>
-                <th className="py-3 px-4 font-semibold">CONTRACT PERIOD</th>
-                <th className="py-3 px-4 font-semibold">CONTRACT DOC</th>
-                <th className="py-3 px-4 font-semibold">PROGRESS</th>
-                <th className="py-3 px-4 font-semibold">STATUS</th>
-                <th className="py-3 px-4 font-semibold text-right">RECORD</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100 font-sans">
-              {properties.map((prop) => {
-                const status = getTenancyStatus(prop);
-                const refCode = getPropertyRef(prop.id);
-                return (
-                  <tr
-                    key={prop.id}
-                    className="hover:bg-page/60 transition-colors group interactive-row lit"
-                  >
-                    <td className="py-4 px-4 font-mono text-[11px] text-ink-500 font-bold whitespace-nowrap align-top">
-                      {refCode}
-                    </td>
-                    <td className="py-4 px-4 font-medium text-ink-900 align-top">
-                      <Link
-                        href={`/properties/${prop.id}`}
-                        className="font-semibold text-ink-900 hover:text-accent flex flex-col"
-                      >
-                        <span className="text-sm font-bold text-ink-900 group-hover:text-accent transition-colors">
-                          {prop.name}
-                        </span>
-                        {prop.address ? (
-                          <span className="text-[11px] text-ink-500 font-normal mt-0.5">
-                            {prop.address}
+        <div className="space-y-6">
+          <div className="border border-ink-200 bg-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-ink-200 bg-page text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                  <th className="py-3 px-4 font-semibold">REF</th>
+                  <th className="py-3 px-4 font-semibold">PROPERTY & ADDRESS</th>
+                  <th className="py-3 px-4 font-semibold">CONTRACT STATUS</th>
+                  <th className="py-3 px-4 font-semibold">LINKED OWNER</th>
+                  <th className="py-3 px-4 font-semibold">REPORT STATUS</th>
+                  <th className="py-3 px-4 font-semibold text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100 font-sans">
+                {properties.map((prop) => {
+                  const reportStatus = getReportStatus(prop);
+                  const contractStatus = getContractStatus(prop.tenancy_end, prop.tenancy_start);
+                  const refCode = getPropertyRef(prop.id);
+                  const linkedOwner = prop.linked_owner_property;
+
+                  return (
+                    <tr
+                      key={prop.id}
+                      className="hover:bg-page/60 transition-colors group interactive-row lit"
+                    >
+                      <td className="py-4 px-4 font-mono text-[11px] text-ink-500 font-bold whitespace-nowrap align-top">
+                        {refCode}
+                      </td>
+                      <td className="py-4 px-4 font-medium text-ink-900 align-top">
+                        <Link
+                          href={`/properties/${prop.id}`}
+                          className="font-semibold text-ink-900 hover:text-accent flex flex-col"
+                        >
+                          <span className="text-sm font-bold text-ink-900 group-hover:text-accent transition-colors">
+                            {prop.name}
                           </span>
+                          {prop.address ? (
+                            <span className="text-[11px] text-ink-500 font-normal mt-0.5">
+                              {prop.address}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-ink-400 font-mono mt-0.5">
+                              No address specified
+                            </span>
+                          )}
+                        </Link>
+                      </td>
+                      <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
+                        <div className="font-semibold text-ink-800">{contractStatus.label}</div>
+                        <div className="text-ink-400 text-[10px] mt-0.5">
+                          {prop.tenancy_start} → {prop.tenancy_end || "Ongoing"}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
+                        {linkedOwner ? (
+                          <div>
+                            <span className="text-ink-900 font-medium">{linkedOwner.name}</span>
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className={`text-[10px] uppercase font-semibold ${linkedOwner.shared ? "text-accepted" : "text-ink-500"}`}>
+                                {linkedOwner.shared ? "Shared" : "Not shared"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleShare(linkedOwner.link_id, linkedOwner.shared)}
+                                disabled={updatingShareId === linkedOwner.link_id}
+                                className="text-[10px] text-accent underline hover:text-accent-hover"
+                              >
+                                {linkedOwner.shared ? "Revoke" : "Share"}
+                              </button>
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-[11px] text-ink-400 font-mono mt-0.5">
-                            No address specified
-                          </span>
+                          <span className="text-ink-400 font-mono">Not linked</span>
                         )}
-                      </Link>
-                    </td>
-                    <td className="py-4 px-4 font-mono text-[11px] text-ink-600 whitespace-nowrap align-top">
-                      <div>{prop.tenancy_start}</div>
-                      <div className="text-ink-400 text-[10px]">
-                        {prop.tenancy_end ? `valid until ${prop.tenancy_end}` : "(Ongoing)"}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
-                      {prop.contract ? (
-                        <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-page text-ink-700 border border-ink-200 truncate max-w-[120px]" title={prop.contract.original_name}>
-                          {prop.contract.original_name}
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap align-top">
+                        <span
+                          className={`inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${reportStatus.style}`}
+                        >
+                          {reportStatus.label}
                         </span>
-                      ) : (
-                        <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-wear-bg text-wear border border-wear-border">
-                          CONTRACT MISSING
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-[11px] text-ink-700 whitespace-nowrap align-top">
-                      <div>
-                        <span className="text-ink-500">Move-in:</span>{" "}
-                        <strong className="text-ink-900">{prop.move_in_count}</strong> areas
-                      </div>
-                      <div className="text-[10px] text-ink-500 mt-0.5">
-                        Move-out: {prop.move_out_count} / {prop.move_in_count || 0}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap align-top">
-                      <span
-                        className={`inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${status.style}`}
-                      >
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-right whitespace-nowrap align-top">
-                      <Link
-                        href={`/properties/${prop.id}`}
-                        className="inline-flex items-center text-xs font-mono text-accent hover:underline font-semibold"
-                      >
-                        Open Record →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        <div className="text-[10px] text-ink-500 font-mono mt-1">
+                          {prop.move_in_count} in · {prop.move_out_count} out
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-right whitespace-nowrap align-top">
+                        <Link
+                          href={`/properties/${prop.id}`}
+                          className="inline-flex items-center text-xs font-mono text-accent hover:underline font-semibold"
+                        >
+                          Open Record →
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 30-Day Ending Notices */}
+          {properties
+            .filter((p) => {
+              const cs = getContractStatus(p.tenancy_end, p.tenancy_start);
+              return cs.isEndingSoon || cs.isEnded;
+            })
+            .map((prop) => (
+              <div
+                key={`notice-${prop.id}`}
+                className="p-4 bg-page border border-ink-300 text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1">
+                  <div className="font-bold text-ink-900 flex items-center gap-2">
+                    <span>{prop.name}:</span>
+                    <span>Your contract ends soon. You can share your move-out report with the owner.</span>
+                  </div>
+                  <div className="text-[11px] text-ink-600 font-sans">
+                    Capture departure photographs and compare with move-in baseline to produce a verified condition record.
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {prop.linked_owner_property && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleToggleShare(
+                          prop.linked_owner_property!.link_id,
+                          prop.linked_owner_property!.shared
+                        )
+                      }
+                      disabled={updatingShareId === prop.linked_owner_property.link_id}
+                      className="px-3 py-1.5 border border-ink-300 bg-surface hover:bg-white text-ink-800 text-[11px] uppercase font-semibold transition-colors"
+                    >
+                      {prop.linked_owner_property.shared ? "Sharing Active [Turn Off]" : "Turn On Sharing"}
+                    </button>
+                  )}
+                  <Link
+                    href={`/report?propertyId=${prop.id}`}
+                    className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-[11px] uppercase font-semibold transition-colors"
+                  >
+                    Start move-out check →
+                  </Link>
+                </div>
+              </div>
+            ))}
         </div>
       )}
 

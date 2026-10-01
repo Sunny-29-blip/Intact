@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { api, ApiError } from "@/lib/api";
 import { uploadAndRegisterDocument } from "@/lib/client-document";
 import { createOwnerPropertySchema } from "@/lib/validation";
+import { getContractStatus } from "@/lib/contract-status";
 import type { OwnerProperty } from "@/types/database";
 
 const ALLOWED_MIMES = [
@@ -318,116 +319,228 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* First-time empty state: 3 steps */}
       {!loading && !error && properties.length === 0 && (
-        <div className="border border-ink-200 bg-surface p-10 sm:p-16 text-center max-w-xl mx-auto my-8">
-          <div className="w-8 h-8 border border-ink-200 bg-page mx-auto flex items-center justify-center text-ink-500 font-mono text-xs mb-3">
-            00
+        <div className="border border-ink-200 bg-surface p-8 sm:p-12 max-w-2xl mx-auto my-8">
+          <div className="border-b border-ink-200 pb-4 mb-6 text-center">
+            <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+              WELCOME TO INTACT OWNER PORTAL
+            </div>
+            <h2 className="text-xl font-bold text-ink-900 mt-1">
+              Register your rental properties in three steps
+            </h2>
+            <p className="text-xs text-ink-600 mt-1">
+              Manage join codes, track tenancy periods and review tenant-shared condition reports.
+            </p>
           </div>
-          <div className="text-[10px] font-mono uppercase text-ink-500 mb-1">
-            REGISTER EMPTY
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 01</div>
+              <div className="text-xs font-bold text-ink-900">Add a property</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Register the flat or house with its location details and owner credentials.
+              </div>
+            </div>
+
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 02</div>
+              <div className="text-xs font-bold text-ink-900">Add documents</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Upload private ownership evidence (e.g. deed, property tax receipt).
+              </div>
+            </div>
+
+            <div className="p-4 bg-page border border-ink-200 space-y-2">
+              <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 03</div>
+              <div className="text-xs font-bold text-ink-900">Give join code</div>
+              <div className="text-[11px] text-ink-600 leading-relaxed">
+                Give your tenant their 8-character join code to link their condition records.
+              </div>
+            </div>
           </div>
-          <h2 className="text-lg font-bold text-ink-900 mb-2">
-            No Properties Registered Yet
-          </h2>
-          <p className="text-xs text-ink-600 leading-relaxed mb-6 max-w-md mx-auto">
-            Register your rental property with private ownership documents to generate a secure join code. Share the code with your tenant so they can link their inspection records.
-          </p>
-          <button
-            onClick={openAddModal}
-            className="px-5 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark min-h-[48px] sm:min-h-0"
-          >
-            + Add property
-          </button>
+
+          <div className="text-center">
+            <button
+              onClick={openAddModal}
+              className="px-6 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark"
+            >
+              + Add a property
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Structured Register Table */}
+      {/* Structured Register Table with Expandable Tenants */}
       {!loading && !error && properties.length > 0 && (
-        <div className="border border-ink-200 bg-surface overflow-x-auto mb-8">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-ink-200 bg-page text-[10px] font-mono uppercase text-ink-500 tracking-wider">
-                <th className="py-3 px-4 font-semibold">PROPERTY & ADDRESS</th>
-                <th className="py-3 px-4 font-semibold">OWNER NAME</th>
-                <th className="py-3 px-4 font-semibold">JOIN CODE</th>
-                <th className="py-3 px-4 font-semibold">DOCUMENTS</th>
-                <th className="py-3 px-4 font-semibold">LINKED TENANTS</th>
-                <th className="py-3 px-4 font-semibold text-right">ACTION</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100 font-sans">
-              {properties.map((prop) => (
-                <tr
-                  key={prop.id}
-                  className="hover:bg-page/60 transition-colors group interactive-row lit"
-                >
-                  <td className="py-4 px-4 font-medium text-ink-900 align-top">
-                    <Link
-                      href={`/owner/properties/${prop.id}`}
-                      className="font-semibold text-ink-900 hover:text-accent flex flex-col"
-                    >
-                      <span className="text-sm font-bold text-ink-900 group-hover:text-accent transition-colors">
-                        {prop.name}
-                      </span>
-                      <span className="text-[11px] text-ink-500 font-normal mt-0.5">
-                        {prop.address || "No address specified"}
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="py-4 px-4 font-mono text-[11px] text-ink-700 whitespace-nowrap align-top">
-                    {prop.owner_name || "—"}
-                  </td>
-                  <td className="py-4 px-4 font-mono text-[12px] whitespace-nowrap align-top">
-                    <div className="inline-flex items-center gap-2 bg-page border border-ink-200 px-2.5 py-1">
-                      <span className="font-bold tracking-wider text-ink-900">
-                        {prop.join_code}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCode(prop.join_code)}
-                        className="text-[10px] uppercase font-semibold text-accent hover:text-accent-hover tracking-wider border-l border-ink-200 pl-2 transition-colors"
-                        title="Copy join code"
-                      >
-                        {copiedCode === prop.join_code ? "COPIED" : "COPY"}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
-                    {prop.documents_missing ? (
-                      <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-wear-bg text-wear border border-wear-border">
-                        DOCUMENTS MISSING
-                      </span>
-                    ) : (
-                      <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-page text-ink-700 border border-ink-200">
-                        {prop.documents_count || 0} {(prop.documents_count === 1 ? "FILE" : "FILES")}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${
-                        (prop.linked_tenants_count || 0) > 0
-                          ? "bg-accent-tint text-accent border-accent-border"
-                          : "bg-page text-ink-500 border-ink-200"
-                      }`}
-                    >
-                      {prop.linked_tenants_count || 0}{" "}
-                      {(prop.linked_tenants_count || 0) === 1 ? "TENANT" : "TENANTS"}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-right whitespace-nowrap align-top">
-                    <Link
-                      href={`/owner/properties/${prop.id}`}
-                      className="inline-flex items-center text-xs font-mono text-accent hover:underline font-semibold"
-                    >
-                      View Details →
-                    </Link>
-                  </td>
+        <div className="space-y-6">
+          <div className="border border-ink-200 bg-surface overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-ink-200 bg-page text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                  <th className="py-3 px-4 font-semibold">PROPERTY & ADDRESS</th>
+                  <th className="py-3 px-4 font-semibold">OWNER NAME</th>
+                  <th className="py-3 px-4 font-semibold">JOIN CODE</th>
+                  <th className="py-3 px-4 font-semibold">DOCUMENTS</th>
+                  <th className="py-3 px-4 font-semibold">LINKED TENANTS</th>
+                  <th className="py-3 px-4 font-semibold text-right">ACTION</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-ink-100 font-sans">
+                {properties.map((prop) => (
+                  <tr
+                    key={prop.id}
+                    className="hover:bg-page/60 transition-colors group interactive-row lit"
+                  >
+                    <td className="py-4 px-4 font-medium text-ink-900 align-top">
+                      <Link
+                        href={`/owner/properties/${prop.id}`}
+                        className="font-semibold text-ink-900 hover:text-accent flex flex-col"
+                      >
+                        <span className="text-sm font-bold text-ink-900 group-hover:text-accent transition-colors">
+                          {prop.name}
+                        </span>
+                        <span className="text-[11px] text-ink-500 font-normal mt-0.5">
+                          {prop.address || "No address specified"}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="py-4 px-4 font-mono text-[11px] text-ink-700 whitespace-nowrap align-top">
+                      {prop.owner_name || "—"}
+                    </td>
+                    <td className="py-4 px-4 font-mono text-[12px] whitespace-nowrap align-top">
+                      <div className="inline-flex items-center gap-2 bg-page border border-ink-200 px-2.5 py-1">
+                        <span className="font-bold tracking-wider text-ink-900">
+                          {prop.join_code}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCode(prop.join_code)}
+                          className="text-[10px] uppercase font-semibold text-accent hover:text-accent-hover tracking-wider border-l border-ink-200 pl-2 transition-colors"
+                          title="Copy join code"
+                        >
+                          {copiedCode === prop.join_code ? "COPIED" : "COPY"}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
+                      {prop.documents_missing ? (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-wear-bg text-wear border border-wear-border">
+                          DOCUMENTS MISSING
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold bg-page text-ink-700 border border-ink-200">
+                          {prop.documents_count || 0} {(prop.documents_count === 1 ? "FILE" : "FILES")}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap align-top">
+                      <span
+                        className={`inline-block px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${
+                          (prop.linked_tenants_count || 0) > 0
+                            ? "bg-accent-tint text-accent border-accent-border"
+                            : "bg-page text-ink-500 border-ink-200"
+                        }`}
+                      >
+                        {prop.linked_tenants_count || 0}{" "}
+                        {(prop.linked_tenants_count || 0) === 1 ? "TENANT" : "TENANTS"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-right whitespace-nowrap align-top">
+                      <Link
+                        href={`/owner/properties/${prop.id}`}
+                        className="inline-flex items-center text-xs font-mono text-accent hover:underline font-semibold"
+                      >
+                        View Details →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Linked Tenants Section per property */}
+          {properties.some((p) => (p as any).linked_tenants && (p as any).linked_tenants.length > 0) && (
+            <div className="border border-ink-200 bg-surface p-5 sm:p-6 space-y-4">
+              <div className="border-b border-ink-200 pb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-mono uppercase text-ink-500 font-bold">
+                    LINKED TENANCIES REGISTER
+                  </div>
+                  <h3 className="text-sm font-bold text-ink-900 mt-0.5">
+                    Tenant Contract Status & Condition Reports
+                  </h3>
+                </div>
+                <span className="text-xs font-mono text-ink-500">
+                  Sorted by soonest contract end
+                </span>
+              </div>
+
+              <div className="divide-y divide-ink-100">
+                {properties.map((prop) => {
+                  const tenants = (prop as any).linked_tenants || [];
+                  if (tenants.length === 0) return null;
+
+                  return (
+                    <div key={`tenants-${prop.id}`} className="py-3 space-y-2">
+                      <div className="text-xs font-mono font-bold text-ink-900 flex items-center gap-2">
+                        <span>{prop.name}</span>
+                        <span className="text-[10px] text-ink-400 font-normal">({prop.join_code})</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {tenants.map((t: any) => {
+                          const cs = getContractStatus(t.tenancy_end, t.tenancy_start);
+                          const isLeavingSoonOrEndedUnshared =
+                            (cs.isEndingSoon || cs.isEnded) && !t.shared;
+
+                          return (
+                            <div
+                              key={t.link_id}
+                              className="p-3 bg-page border border-ink-200 text-xs font-mono space-y-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-ink-900">{t.tenant_name}</span>
+                                <span className="text-[10px] text-ink-600 bg-surface px-2 py-0.5 border border-ink-200">
+                                  {cs.label}
+                                </span>
+                              </div>
+
+                              <div className="text-[11px] text-ink-600 flex items-center justify-between">
+                                <span>Period: {t.tenancy_start} → {t.tenancy_end || "Ongoing"}</span>
+                                <span className="font-semibold text-ink-800">{t.report_status}</span>
+                              </div>
+
+                              {isLeavingSoonOrEndedUnshared && (
+                                <div className="p-2 bg-wear-bg border border-wear-border text-wear text-[11px]">
+                                  Leaving soon. Report not shared yet.
+                                </div>
+                              )}
+
+                              {t.shared && (
+                                <div className="pt-2 border-t border-ink-200 flex items-center justify-between">
+                                  <span className="text-[10px] text-accepted font-semibold">
+                                    Report Shared by Tenant
+                                  </span>
+                                  <Link
+                                    href={`/owner/reports/${t.link_id}`}
+                                    className="text-accent underline font-semibold hover:text-accent-hover text-[11px]"
+                                  >
+                                    Open Condition Report →
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
