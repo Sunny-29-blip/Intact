@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AppNav } from "@/components/AppNav";
+import { AmbientLightTracker } from "@/components/AmbientLightTracker";
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="min-h-screen bg-page text-ink-900 font-sans antialiased flex flex-col selection:bg-accent-tint selection:text-accent">
+        <AmbientLightTracker />
         <AppNav />
         <div className="flex-1 flex flex-col">{children}</div>
       </body>

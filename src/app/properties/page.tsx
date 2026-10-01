@@ -123,7 +123,7 @@ export default function PropertiesPage() {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center justify-center px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors self-start sm:self-auto"
+          className="inline-flex items-center justify-center px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors self-start sm:self-auto btn-motion lit-dark"
         >
           + Add property
         </button>
@@ -135,7 +135,7 @@ export default function PropertiesPage() {
           <span>{error}</span>
           <button
             onClick={fetchProperties}
-            className="underline font-semibold hover:text-damage ml-4"
+            className="underline font-semibold hover:text-damage ml-4 btn-motion"
           >
             Retry
           </button>
@@ -173,7 +173,7 @@ export default function PropertiesPage() {
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit-dark"
           >
             + Add property
           </button>
@@ -200,7 +200,7 @@ export default function PropertiesPage() {
                 return (
                   <tr
                     key={prop.id}
-                    className="hover:bg-page/60 transition-colors group"
+                    className="hover:bg-page/60 transition-colors group interactive-row lit"
                   >
                     <td className="py-3.5 px-4 font-medium text-ink-900">
                       <Link
@@ -376,14 +376,14 @@ export default function PropertiesPage() {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   disabled={submitting}
-                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 text-xs font-semibold uppercase tracking-wider transition-colors"
+                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 text-xs font-semibold uppercase tracking-wider transition-colors btn-motion lit"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50 btn-motion lit-dark"
                 >
                   {submitting ? "Recording..." : "Create Record"}
                 </button>

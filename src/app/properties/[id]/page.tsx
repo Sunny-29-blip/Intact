@@ -372,25 +372,25 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 <Link
                   href={`/report/${property.share_token}`}
                   target="_blank"
-                  className="px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent-tint border border-accent-border transition-colors uppercase tracking-wider"
+                  className="px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent-tint border border-accent-border transition-colors uppercase tracking-wider btn-motion lit"
                 >
                   View Inspection Report ↗
                 </Link>
                 <button
                   onClick={copyShareLink}
-                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
                 >
                   {copiedShare ? "✓ Link Copied" : "Copy Landlord Link"}
                 </button>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="px-3 py-1.5 text-xs font-semibold text-damage hover:bg-damage-bg border border-damage-border transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-damage hover:bg-damage-bg border border-damage-border transition-colors btn-motion lit"
                 >
                   Delete
                 </button>
@@ -510,7 +510,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   <button
                     type="submit"
                     disabled={moveInUploading || !moveInFile}
-                    className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50"
+                    className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 btn-motion lit-dark"
                   >
                     {moveInUploading ? (moveInStatusText || "Uploading...") : "+ Add Baseline Photo"}
                   </button>
@@ -528,7 +528,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 {moveInPhotos.map((photo) => (
                   <div
                     key={photo.id}
-                    className="border border-ink-200 bg-page flex flex-col p-3"
+                    className="border border-ink-200 bg-page flex flex-col p-3 photo-frame lit"
                   >
                     <div className="aspect-[4/3] bg-ink-100 border border-ink-200 relative flex items-center justify-center overflow-hidden mb-2.5">
                       {photo.signed_url ? (
@@ -641,7 +641,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                     <button
                       type="submit"
                       disabled={moveOutUploading || !moveOutFile || !moveOutArea}
-                      className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50"
+                      className="w-full py-2 px-3 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 btn-motion lit-dark"
                     >
                       {moveOutUploading ? (moveOutStatusText || "Uploading...") : "+ Pair Move-Out Photo"}
                     </button>
@@ -763,14 +763,14 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   type="button"
                   onClick={() => setShowEditModal(false)}
                   disabled={editSubmitting}
-                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors"
+                  className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors btn-motion lit"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editSubmitting}
-                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50 btn-motion lit-dark"
                 >
                   {editSubmitting ? "Saving..." : "Save Changes"}
                 </button>
@@ -797,7 +797,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors"
+                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors btn-motion lit"
               >
                 Cancel
               </button>
@@ -805,7 +805,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 type="button"
                 onClick={handleDeleteProperty}
                 disabled={deleting}
-                className="px-4 py-2 bg-damage hover:bg-damage text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-damage hover:bg-damage text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50 btn-motion lit"
               >
                 {deleting ? "Deleting Record..." : "Permanently Delete"}
               </button>

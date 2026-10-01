@@ -57,7 +57,7 @@ export function AppNav() {
             <nav className="hidden sm:flex items-center space-x-1 text-xs font-medium">
               <Link
                 href="/properties"
-                className={`px-3 py-1.5 transition-colors border ${
+                className={`px-3 py-1.5 transition-colors border lit ${
                   pathname.startsWith("/properties")
                     ? "bg-page border-ink-200 text-ink-900 font-semibold"
                     : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
@@ -79,7 +79,7 @@ export function AppNav() {
               </span>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 font-sans text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
+                className="px-3 py-1.5 font-sans text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
               >
                 Log out
               </button>
@@ -88,13 +88,13 @@ export function AppNav() {
             <div className="flex items-center space-x-2">
               <Link
                 href="/login"
-                className="px-3 py-1.5 text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors"
+                className="px-3 py-1.5 text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
               >
                 Sign In
               </Link>
               <Link
                 href="/signup"
-                className="px-3 py-1.5 text-xs text-white bg-accent hover:bg-accent-hover transition-colors font-medium"
+                className="px-3 py-1.5 text-xs text-white bg-accent hover:bg-accent-hover transition-colors font-medium btn-motion lit-dark"
               >
                 Sign Up
               </Link>
