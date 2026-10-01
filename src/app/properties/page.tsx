@@ -343,7 +343,7 @@ export default function PropertiesPage() {
               <div className="text-[10px] font-mono text-accent font-bold uppercase">STEP 03</div>
               <div className="text-xs font-bold text-ink-900">Run a report</div>
               <div className="text-[11px] text-ink-600 leading-relaxed">
-                Drop baseline move-in photos and compare them when moving out with Gemini.
+                Drop baseline move-in photos and compare them when moving out.
               </div>
             </div>
           </div>

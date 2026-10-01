@@ -331,7 +331,9 @@ export async function POST(request: NextRequest) {
     try {
       geminiResponse = await comparePhotosWithGemini({
         moveInBase64,
+        moveInMimeType: moveInBlob.type || undefined,
         moveOutBase64,
+        moveOutMimeType: moveOutBlob.type || undefined,
         area,
         propertyName: property.name,
         tenancyMonths,
@@ -346,7 +348,7 @@ export async function POST(request: NextRequest) {
         aiErr instanceof Error
           ? aiErr.message.includes("timed out")
             ? "Visual comparison timed out. Please try again in a few moments."
-            : "The AI comparison service is temporarily unavailable. Please try again."
+            : "The photo comparison could not be completed right now. Please try again."
           : "Visual comparison failed.";
 
       await supabase
@@ -408,6 +410,13 @@ export async function POST(request: NextRequest) {
 
       if (insertFindingsErr) {
         console.error("[POST /api/comparisons] Findings insert error:", insertFindingsErr);
+        const errMessage = "We could not save the differences we found. Try again.";
+        await supabase
+          .from("comparisons")
+          .update({ status: "failed", error: errMessage })
+          .eq("id", comparisonId)
+          .eq("user_id", user.id);
+        return apiError("DB_ERROR", errMessage, 500);
       } else if (inserted) {
         insertedFindings = inserted;
       }

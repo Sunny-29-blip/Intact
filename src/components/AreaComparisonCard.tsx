@@ -602,7 +602,7 @@ export function AreaComparisonCard({
                               {getClassificationLabel(finding.classification)}
                             </span>
                             <span className="text-ink-500 uppercase">
-                              · {finding.severity} severity · {Math.round(finding.confidence * 100)}% confidence
+                              · {finding.severity} severity · {finding.confidence >= 0.8 ? "High" : finding.confidence >= 0.5 ? "Medium" : "Low"} confidence
                             </span>
                             {hasNoBox && (
                               <span className="font-mono text-[10px] text-ink-500 bg-page px-1.5 py-0.5 border border-ink-200">
