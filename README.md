@@ -60,7 +60,10 @@ Intact uses a secure server-centric architecture. Tenant interactions (managing 
 
 ## Deployment
 
-Deploy directly to [Vercel](https://vercel.com/) by connecting your GitHub repository and supplying the environment variables listed above in the Vercel Project Settings.
+- **Live URL**: [https://intact-in.vercel.app](https://intact-in.vercel.app)
+- **Vercel Project**: [https://vercel.com/puttusrinivasulu29-4065/intact](https://vercel.com/puttusrinivasulu29-4065/intact)
+
+Deployed on Vercel with automated GitHub integration and serverless environment variable encryption.
 
 ## Screenshots
 
