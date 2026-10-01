@@ -40,7 +40,7 @@ export function AppNav() {
 
   return (
     <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <Link
             href="/"
@@ -48,12 +48,13 @@ export function AppNav() {
           >
             <span className="w-2.5 h-2.5 bg-accent rounded-none inline-block"></span>
             <span className="font-sans tracking-wide">INTACT</span>
-            <span className="text-[11px] font-mono font-normal text-ink-500 uppercase px-1.5 py-0.5 border border-ink-200">
-              Record
+            <span className="text-ink-400 font-mono font-normal text-xs">—</span>
+            <span className="text-[10px] font-mono font-normal text-ink-500 uppercase tracking-wider">
+              INSPECTION RECORD
             </span>
           </Link>
 
-          <nav className="hidden sm:flex items-center space-x-1 text-xs font-medium">
+          <nav className="hidden md:flex items-center space-x-1 text-xs font-mono uppercase tracking-wider">
             <Link
               href="/properties"
               className={`px-3 py-1.5 transition-colors border lit ${
@@ -83,17 +84,20 @@ export function AppNav() {
           </nav>
         </div>
 
-        <div className="flex items-center space-x-3 text-xs">
+        <div className="flex items-center space-x-3 text-xs font-mono">
           {loading ? (
             <div className="w-24 h-4 bg-page animate-pulse" />
           ) : user ? (
             <div className="flex items-center space-x-3">
-              <span className="hidden md:inline font-mono text-[11px] text-ink-600 px-2 py-0.5 bg-page border border-ink-200">
+              <Link
+                href="/properties"
+                className="hidden sm:inline-block px-2.5 py-1 text-[11px] text-ink-700 bg-page border border-ink-200 hover:border-ink-400 truncate max-w-xs"
+              >
                 {user.email}
-              </span>
+              </Link>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 font-sans text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
+                className="px-3 py-1.5 uppercase tracking-wider text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
               >
                 Log out
               </button>
@@ -102,15 +106,15 @@ export function AppNav() {
             <div className="flex items-center space-x-2">
               <Link
                 href="/login"
-                className="px-3 py-1.5 text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
+                className="px-3.5 py-2 uppercase tracking-wider text-[11px] text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
               >
-                Sign In
+                Log In
               </Link>
               <Link
                 href="/signup"
-                className="px-3 py-1.5 text-xs text-white bg-accent hover:bg-accent-hover transition-colors font-medium btn-motion lit-dark"
+                className="px-4 py-2 uppercase tracking-wider text-[11px] text-white bg-accent hover:bg-accent-hover transition-colors font-semibold btn-motion lit-dark"
               >
-                Sign Up
+                Start a record
               </Link>
             </div>
           )}
