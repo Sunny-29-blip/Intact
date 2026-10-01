@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authSchema } from "@/lib/validation";
 import { api } from "@/lib/api";
-import { UserRole } from "@/types/database";
+import { PasswordField } from "@/components/PasswordField";
+import type { UserRole } from "@/types/database";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -16,7 +17,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
@@ -25,19 +25,60 @@ export default function SignupPage() {
     general?: string;
   }>({});
   const [loading, setLoading] = useState(false);
-  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    if (errors.password) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.password;
+        return next;
+      });
+    }
+    if (confirmPassword && val === confirmPassword && errors.confirmPassword) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.confirmPassword;
+        return next;
+      });
+    }
+  };
+
+  const handleConfirmPasswordChange = (val: string) => {
+    setConfirmPassword(val);
+    if (errors.confirmPassword && (val === password || !val)) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.confirmPassword;
+        return next;
+      });
+    }
+  };
+
+  const handleConfirmBlur = () => {
+    if (confirmPassword && password !== confirmPassword) {
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: "Passwords do not match",
+      }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setErrors({});
-    setSuccessNotice(null);
 
+    const trimmedEmail = email.trim();
+
+    // 1. Validate matching passwords
     if (password !== confirmPassword) {
-      setErrors({ confirmPassword: "Passwords do not match." });
+      setErrors({ confirmPassword: "Passwords do not match" });
       return;
     }
 
-    const validation = authSchema.safeParse({ email, password });
+    // 2. Validate format and minimum 8 chars
+    const validation = authSchema.safeParse({ email: trimmedEmail, password });
     if (!validation.success) {
       const fieldErrors = validation.error.flatten().fieldErrors;
       setErrors({
@@ -49,7 +90,7 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const trimmedEmail = email.trim();
+      // 3. Call Supabase signUp (no emailRedirectTo)
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
@@ -71,6 +112,10 @@ export default function SignupPage() {
           setErrors({
             general: "An account with this email already exists. Log in instead.",
           });
+        } else if (errorMsg.includes("at least") || errorMsg.includes("password")) {
+          setErrors({
+            password: error.message,
+          });
         } else {
           setErrors({ general: error.message || "Failed to create account." });
         }
@@ -86,27 +131,57 @@ export default function SignupPage() {
         return;
       }
 
-      if (data.session) {
-        // Create the profile record
-        await api.createProfile({
-          role: roleTab,
-          display_name: name.trim() || undefined,
-        }).catch((err) => {
-          console.error("Profile creation error:", err);
+      let activeSession = data.session;
+
+      // If signUp returns a user but no session, immediately call signInWithPassword
+      if (!activeSession) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
         });
 
-        if (roleTab === "owner") {
-          router.push("/owner");
-        } else {
-          router.push("/properties");
+        if (signInError) {
+          setLoading(false);
+          const signInMsg = (signInError.message || "").toLowerCase();
+          if (
+            signInMsg.includes("email not confirmed") ||
+            signInMsg.includes("confirm your email") ||
+            (signInError as { code?: string }).code === "email_not_confirmed"
+          ) {
+            setErrors({
+              general:
+                "Your account was created, but the project still requires email confirmation. Turn off 'Confirm email' in the Supabase settings.",
+            });
+          } else {
+            setErrors({ general: signInError.message || "Failed to establish session." });
+          }
+          return;
         }
-        router.refresh();
-      } else {
-        setSuccessNotice(
-          "Check your email for the confirmation link to complete your registration."
-        );
-        setLoading(false);
+
+        activeSession = signInData.session;
       }
+
+      if (!activeSession) {
+        setLoading(false);
+        setErrors({
+          general:
+            "Your account was created, but the project still requires email confirmation. Turn off 'Confirm email' in the Supabase settings.",
+        });
+        return;
+      }
+
+      // Create the profile record server-side with selected role
+      await api.createProfile({
+        role: roleTab,
+        display_name: name.trim() || undefined,
+      }).catch((err) => {
+        console.error("Profile creation error:", err);
+      });
+
+      // Go straight to the role's home
+      const destination = roleTab === "owner" ? "/owner" : "/properties";
+      router.push(destination);
+      router.refresh();
     } catch {
       setErrors({ general: "A network error occurred. Please try again." });
       setLoading(false);
@@ -180,12 +255,6 @@ export default function SignupPage() {
             </div>
           )}
 
-          {successNotice && (
-            <div className="mb-5 p-3 text-xs bg-page border border-accent-border text-ink-800 font-mono">
-              {successNotice}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
@@ -233,63 +302,27 @@ export default function SignupPage() {
               )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider">
-                  Password <span className="text-damage">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-[10px] font-mono text-ink-500 hover:text-ink-900 uppercase underline"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "HIDE" : "SHOW"}
-                </button>
-              </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="new-password"
-                disabled={loading}
-                className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
-                  errors.password
-                    ? "border-damage focus:border-damage"
-                    : "border-ink-200 focus:border-accent"
-                }`}
-              />
-              {errors.password ? (
-                <p className="text-[11px] text-damage mt-1 font-mono">{errors.password}</p>
-              ) : (
-                <p className="text-[10px] font-mono text-ink-500 mt-1">
-                  At least 6 characters. No reuse from another service.
-                </p>
-              )}
-            </div>
+            <PasswordField
+              label="Password"
+              value={password}
+              onChange={handlePasswordChange}
+              error={errors.password}
+              hint="At least 8 characters. No reuse from another service."
+              autoComplete="new-password"
+              disabled={loading}
+              required
+            />
 
-            <div>
-              <label className="block text-[11px] font-mono font-medium text-ink-700 uppercase tracking-wider mb-1">
-                Confirm Password <span className="text-damage">*</span>
-              </label>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="new-password"
-                disabled={loading}
-                className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
-                  errors.confirmPassword
-                    ? "border-damage focus:border-damage"
-                    : "border-ink-200 focus:border-accent"
-                }`}
-              />
-              {errors.confirmPassword && (
-                <p className="text-[11px] text-damage mt-1 font-mono">{errors.confirmPassword}</p>
-              )}
-            </div>
+            <PasswordField
+              label="Confirm Password"
+              value={confirmPassword}
+              onChange={handleConfirmPasswordChange}
+              onBlur={handleConfirmBlur}
+              error={errors.confirmPassword}
+              autoComplete="new-password"
+              disabled={loading}
+              required
+            />
 
             <button
               type="submit"
@@ -405,4 +438,3 @@ export default function SignupPage() {
     </main>
   );
 }
-

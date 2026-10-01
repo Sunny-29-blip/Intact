@@ -4,6 +4,10 @@ import "./globals.css";
 import { AppNav } from "@/components/AppNav";
 import { AppFooter } from "@/components/AppFooter";
 import { AmbientLightTracker } from "@/components/AmbientLightTracker";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import type { UserRole } from "@/types/database";
+
+export const dynamic = "force-dynamic";
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -25,18 +29,44 @@ export const metadata: Metadata = {
     "Tenant-side photo documentation and difference comparison engine for rental homes, hostels, and PGs.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let userEmail: string | null = null;
+  let userRole: UserRole | null = null;
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      userEmail = user.email || null;
+      const adminSupabase = createAdminClient();
+      const { data: profile } = await adminSupabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      userRole = (profile?.role as UserRole) || "tenant";
+    }
+  } catch (e) {
+    console.error("Layout auth session retrieval error:", e);
+  }
+
   return (
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="min-h-screen bg-page text-ink-900 font-sans antialiased flex flex-col selection:bg-accent-tint selection:text-accent">
         <AmbientLightTracker />
-        <AppNav />
+        <AppNav
+          initialUser={userEmail ? { email: userEmail } : null}
+          initialRole={userRole}
+        />
         <div className="flex-1 flex flex-col">{children}</div>
-        <AppFooter />
+        <AppFooter isAuthenticated={!!userEmail} userRole={userRole} />
       </body>
     </html>
   );

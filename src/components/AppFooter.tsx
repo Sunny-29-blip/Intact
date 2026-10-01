@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import type { UserRole } from "@/types/database";
 
-export function AppFooter() {
-  const pathname = usePathname();
+interface AppFooterProps {
+  isAuthenticated?: boolean;
+  userRole?: UserRole | null;
+}
 
-  // On report page, print view hides standard footer
+export function AppFooter({
+  isAuthenticated = false,
+  userRole = "tenant",
+}: AppFooterProps) {
+  const isOwner = userRole === "owner";
+
   return (
     <footer className="border-t border-ink-200 bg-surface mt-auto no-print">
       <div className="max-w-[1400px] mx-auto px-5 sm:px-8 py-12 sm:py-16">
@@ -32,37 +39,91 @@ export function AppFooter() {
           {/* Navigation Links Columns */}
           <div className="md:col-span-2">
             <h4 className="text-[10px] font-mono uppercase tracking-wider text-ink-500 font-bold mb-3">
-              Record
+              {isAuthenticated ? "Workspace" : "Explore"}
             </h4>
             <ul className="space-y-2.5 text-xs font-sans">
-              <li>
-                <Link href="/properties" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Properties
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Photo recording
-                </Link>
-              </li>
+              {isAuthenticated ? (
+                <>
+                  <li>
+                    <Link
+                      href={isOwner ? "/owner" : "/properties"}
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      {isOwner ? "Owner Properties" : "Tenant Register"}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/report"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Two-photo check
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link
+                      href="/#example"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Real example
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/#how-it-works"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      How it works
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/#limits"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Scope of record
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 
           <div className="md:col-span-2">
             <h4 className="text-[10px] font-mono uppercase tracking-wider text-ink-500 font-bold mb-3">
-              Report
+              Reports
             </h4>
             <ul className="space-y-2.5 text-xs font-sans">
               <li>
-                <Link href="/report" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Two-photo analysis
-                </Link>
-              </li>
-              <li>
-                <Link href="/report/sample" className="text-ink-600 hover:text-ink-900 transition-colors">
+                <Link
+                  href="/report/sample"
+                  className="text-ink-600 hover:text-ink-900 transition-colors"
+                >
                   Sample report
                 </Link>
               </li>
+              {isAuthenticated ? (
+                <li>
+                  <Link
+                    href="/report"
+                    className="text-ink-600 hover:text-ink-900 transition-colors"
+                  >
+                    Run comparison
+                  </Link>
+                </li>
+              ) : (
+                <li>
+                  <Link
+                    href="/login"
+                    className="text-ink-600 hover:text-ink-900 transition-colors"
+                  >
+                    Open your report
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -71,16 +132,37 @@ export function AppFooter() {
               Account
             </h4>
             <ul className="space-y-2.5 text-xs font-sans">
-              <li>
-                <Link href="/login" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Log in
-                </Link>
-              </li>
-              <li>
-                <Link href="/signup" className="text-ink-600 hover:text-ink-900 transition-colors">
-                  Sign up
-                </Link>
-              </li>
+              {isAuthenticated ? (
+                <>
+                  <li>
+                    <Link
+                      href="/profile"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Your Profile
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link
+                      href="/login"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Log in
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/signup"
+                      className="text-ink-600 hover:text-ink-900 transition-colors"
+                    >
+                      Sign up
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>

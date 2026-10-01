@@ -212,7 +212,7 @@ export default async function HomePage() {
       {/* =========================================================================
           SECTION 02 — A REAL INSPECTION EXAMPLE
           ========================================================================= */}
-      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8 border-b border-ink-200">
+      <section id="example" className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8 border-b border-ink-200 scroll-mt-16">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between border-b border-ink-200 pb-4 mb-8 gap-2">
           <div className="flex items-baseline gap-3">
             <span className="font-mono text-xs font-bold text-ink-900">02</span>
@@ -326,10 +326,10 @@ export default async function HomePage() {
             </ol>
 
             <Link
-              href="/properties"
+              href="/signup"
               className="mt-6 inline-flex min-h-11 items-center border border-ink-300 bg-surface px-5 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-900 hover:border-ink-500 transition-colors btn-motion lit"
             >
-              Open the comparison screen
+              Start an inspection record
             </Link>
           </div>
         </div>
@@ -338,7 +338,7 @@ export default async function HomePage() {
       {/* =========================================================================
           SECTION 03 — HOW INTACT WORKS (Five Stages)
           ========================================================================= */}
-      <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8 border-b border-ink-200">
+      <section id="how-it-works" className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8 border-b border-ink-200 scroll-mt-16">
         <div className="flex items-baseline justify-between border-b border-ink-200 pb-4 mb-8">
           <div className="flex items-baseline gap-3">
             <span className="font-mono text-xs font-bold text-ink-900">03</span>
@@ -395,7 +395,7 @@ export default async function HomePage() {
       {/* =========================================================================
           SECTION 04 — WHAT INTACT DOES NOT DO (Scope of the Record)
           ========================================================================= */}
-      <section className="border-y border-ink-200 bg-page/60">
+      <section id="limits" className="border-y border-ink-200 bg-page/60 scroll-mt-16">
         <div className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
           <div className="flex items-baseline justify-between border-b border-ink-200 pb-4 mb-8">
             <div className="flex items-baseline gap-3">

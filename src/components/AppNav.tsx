@@ -4,40 +4,30 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
 
-export function AppNav() {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+interface AppNavProps {
+  initialUser?: { email: string | null } | null;
+  initialRole?: string | null;
+}
+
+export function AppNav({ initialUser = null, initialRole = null }: AppNavProps) {
+  const [user, setUser] = useState<{ email: string | null } | null>(initialUser);
+  const [role, setRole] = useState<string | null>(initialRole);
   const router = useRouter();
   const pathname = usePathname();
 
+  // Sync props if changed from server
   useEffect(() => {
-    const checkUserAndRole = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      if (data.user) {
-        try {
-          const res = await fetch("/api/profile");
-          if (res.ok) {
-            const body = await res.json();
-            setRole(body.data?.role || "tenant");
-          }
-        } catch {
-          setRole("tenant");
-        }
-      }
-      setLoading(false);
-    };
+    setUser(initialUser);
+    setRole(initialRole);
+  }, [initialUser, initialRole]);
 
-    checkUserAndRole();
-
+  useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
+        setUser({ email: session.user.email || null });
         fetch("/api/profile")
           .then((r) => (r.ok ? r.json() : null))
           .then((body) => {
@@ -45,78 +35,111 @@ export function AppNav() {
           })
           .catch(() => {});
       } else {
+        setUser(null);
         setRole(null);
+      }
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        router.refresh();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setRole(null);
     router.push("/login");
     router.refresh();
   };
 
-  const registerHref = role === "owner" ? "/owner" : "/properties";
-  const isRegisterActive = role === "owner" ? pathname.startsWith("/owner") : pathname.startsWith("/properties");
+  const isOwner = role === "owner";
+  const registerHref = isOwner ? "/owner" : "/properties";
+  const isRegisterActive = isOwner ? pathname.startsWith("/owner") : pathname.startsWith("/properties");
 
   return (
     <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
       <div className="max-w-[1400px] mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
+        {/* Left Side: Brand Logo & Navigation Links */}
         <div className="flex items-center space-x-6">
           <Link
-            href="/"
+            href={user ? (isOwner ? "/owner" : "/properties") : "/"}
             className="flex items-center space-x-2.5 text-ink-900 font-bold tracking-tight text-base group"
           >
             <span className="w-2.5 h-2.5 bg-accent rounded-none inline-block"></span>
             <span className="font-sans tracking-wide">INTACT</span>
             <span className="text-ink-400 font-mono font-normal text-xs">—</span>
             <span className="text-[10px] font-mono font-normal text-ink-500 uppercase tracking-wider">
-              {role === "owner" ? "OWNER REGISTER" : "INSPECTION RECORD"}
+              {user && isOwner ? "OWNER REGISTER" : "INSPECTION RECORD"}
             </span>
           </Link>
 
+          {/* Navigation Links */}
           <nav className="hidden md:flex items-center space-x-1 text-xs font-mono uppercase tracking-wider">
-            <Link
-              href={registerHref}
-              className={`px-3 py-1.5 transition-colors border lit ${
-                isRegisterActive
-                  ? "bg-page border-ink-200 text-ink-900 font-semibold"
-                  : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
-              }`}
-            >
-              {role === "owner" ? "Properties" : "Properties"}
-            </Link>
-            <Link
-              href="/report"
-              className={`px-3 py-1.5 transition-colors border lit ${
-                pathname === "/report"
-                  ? "bg-page border-ink-200 text-ink-900 font-semibold"
-                  : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
-              }`}
-            >
-              Report
-            </Link>
-            {user && (
-              <Link
-                href="/profile"
-                className={`px-3 py-1.5 transition-colors border lit ${
-                  pathname.startsWith("/profile")
-                    ? "bg-page border-ink-200 text-ink-900 font-semibold"
-                    : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
-                }`}
-              >
-                Profile
-              </Link>
+            {user ? (
+              // LOGGED IN NAV
+              <>
+                <Link
+                  href={registerHref}
+                  className={`px-3 py-1.5 transition-colors border lit ${
+                    isRegisterActive
+                      ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                      : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+                  }`}
+                >
+                  {isOwner ? "Dashboard" : "Properties"}
+                </Link>
+                <Link
+                  href="/report"
+                  className={`px-3 py-1.5 transition-colors border lit ${
+                    pathname === "/report"
+                      ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                      : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+                  }`}
+                >
+                  Report
+                </Link>
+                <Link
+                  href="/profile"
+                  className={`px-3 py-1.5 transition-colors border lit ${
+                    pathname.startsWith("/profile")
+                      ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                      : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+                  }`}
+                >
+                  Profile
+                </Link>
+              </>
+            ) : (
+              // LOGGED OUT NAV (Page Anchors Only)
+              <>
+                <Link
+                  href="/#example"
+                  className="px-3 py-1.5 text-ink-600 hover:text-ink-900 transition-colors border border-transparent hover:border-ink-100"
+                >
+                  Example
+                </Link>
+                <Link
+                  href="/#how-it-works"
+                  className="px-3 py-1.5 text-ink-600 hover:text-ink-900 transition-colors border border-transparent hover:border-ink-100"
+                >
+                  How it works
+                </Link>
+                <Link
+                  href="/#limits"
+                  className="px-3 py-1.5 text-ink-600 hover:text-ink-900 transition-colors border border-transparent hover:border-ink-100"
+                >
+                  Limits
+                </Link>
+              </>
             )}
           </nav>
         </div>
 
+        {/* Right Side: Auth Buttons */}
         <div className="flex items-center space-x-3 text-xs font-mono">
-          {loading ? (
-            <div className="w-24 h-4 bg-page animate-pulse" />
-          ) : user ? (
+          {user ? (
             <div className="flex items-center space-x-3">
               <Link
                 href="/profile"
@@ -130,6 +153,7 @@ export function AppNav() {
                 )}
               </Link>
               <button
+                type="button"
                 onClick={handleLogout}
                 className="px-3 py-1.5 uppercase tracking-wider text-xs text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
               >

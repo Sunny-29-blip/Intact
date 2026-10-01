@@ -105,6 +105,10 @@ Database migrations for roles and documents are defined in [`supabase/roles.sql`
 | `GEMINI_API_KEY` | Google Gemini API Key | No (Server only) |
 | `GEMINI_MODEL` | Gemini Model ID (Recommended: `gemini-2.5-flash`) | No (Server only) |
 
+## Limitations
+
+- Email addresses are not verified (confirmation is turned off for this demo).
+
 ## Deployment
 
 - **Live URL**: [https://intact-in.vercel.app](https://intact-in.vercel.app)

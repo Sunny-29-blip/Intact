@@ -214,7 +214,7 @@ export type UpdateFindingDecisionInput = z.infer<typeof updateFindingDecisionSch
  */
 export const authSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export type AuthInput = z.infer<typeof authSchema>;
