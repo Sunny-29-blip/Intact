@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -17,6 +17,8 @@ export function AppNav({ initialUser = null, initialRole = null, initialIsDemo =
   const [isDemo, setIsDemo] = useState<boolean>(initialIsDemo);
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   // Sync props if changed from server
   useEffect(() => {
@@ -43,7 +45,9 @@ export function AppNav({ initialUser = null, initialRole = null, initialIsDemo =
         setRole(null);
         setIsDemo(false);
       }
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      // The signup page finishes profile setup and navigates itself; refreshing here
+      // would let middleware redirect before the profile (and its role) is saved.
+      if ((event === "SIGNED_IN" || event === "SIGNED_OUT") && pathnameRef.current !== "/signup") {
         router.refresh();
       }
     });
