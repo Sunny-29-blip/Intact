@@ -2,86 +2,142 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import {
+  COMPARE_SYSTEM_INSTRUCTION,
+  buildComparisonPrompt,
+  geminiComparisonResponseSchema,
+  type GeminiComparisonResponse,
+} from "@/lib/prompts/compare";
 
 const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 
-export interface GenerateStructuredJsonOptions<T extends z.ZodTypeAny> {
-  prompt: string;
-  schema: T;
-  systemInstruction?: string;
-  model?: string;
+export interface ComparePhotosParams {
+  moveInBase64: string;
+  moveInMimeType?: string;
+  moveOutBase64: string;
+  moveOutMimeType?: string;
+  area: string;
+  propertyName: string;
+  tenancyMonths: number;
+  tenancyStart: string;
+  tenancyEnd?: string | null;
+  leaseNotes?: string | null;
   timeoutMs?: number;
 }
 
 /**
- * Server-only helper to generate structured, JSON-validated output from Gemini.
- * Uses the model specified in GEMINI_MODEL (defaults to gemini-2.5-flash).
- * Includes timeout protection, JSON parsing, and Zod schema validation.
+ * Server-only helper to invoke Gemini multimodal visual comparison on move-in and move-out photos.
+ * Implements 45-second timeout, JSON mode, Zod validation, and automated 1x retry on failure.
  */
-export async function generateStructuredJson<T extends z.ZodTypeAny>({
-  prompt,
-  schema,
-  systemInstruction,
-  model = env.GEMINI_MODEL,
-  timeoutMs = 15000,
-}: GenerateStructuredJsonOptions<T>): Promise<z.infer<T>> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+export async function comparePhotosWithGemini(
+  params: ComparePhotosParams
+): Promise<GeminiComparisonResponse> {
+  const timeoutMs = params.timeoutMs || 45000;
+  const promptText = buildComparisonPrompt({
+    area: params.area,
+    propertyName: params.propertyName,
+    tenancyMonths: params.tenancyMonths,
+    tenancyStart: params.tenancyStart,
+    tenancyEnd: params.tenancyEnd,
+    leaseNotes: params.leaseNotes,
+  });
 
-  try {
-    const responsePromise = ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-      },
-    });
+  const runCall = async (): Promise<GeminiComparisonResponse> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      controller.signal.addEventListener("abort", () => {
-        reject(new Error(`Gemini API call timed out after ${timeoutMs}ms`));
-      });
-    });
-
-    const response = await Promise.race([responsePromise, timeoutPromise]);
-
-    const rawText = response.text;
-    if (!rawText) {
-      throw new Error("Empty response received from Gemini API");
-    }
-
-    let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(rawText);
-    } catch (parseError) {
+      const responsePromise = ai.models.generateContent({
+        model: env.GEMINI_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: promptText },
+              {
+                inlineData: {
+                  mimeType: params.moveInMimeType || "image/jpeg",
+                  data: params.moveInBase64,
+                },
+              },
+              {
+                inlineData: {
+                  mimeType: params.moveOutMimeType || "image/jpeg",
+                  data: params.moveOutBase64,
+                },
+              },
+            ],
+          },
+        ],
+        config: {
+          systemInstruction: COMPARE_SYSTEM_INSTRUCTION,
+          responseMimeType: "application/json",
+        },
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener("abort", () => {
+          reject(new Error(`Gemini visual comparison timed out after ${timeoutMs}ms`));
+        });
+      });
+
+      const response = await Promise.race([responsePromise, timeoutPromise]);
+      const rawText = response.text;
+
+      if (!rawText) {
+        throw new Error("Received empty text response from Gemini API");
+      }
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch (parseError) {
+        throw new Error(
+          `Failed to parse Gemini output as JSON: ${
+            parseError instanceof Error ? parseError.message : String(parseError)
+          }`
+        );
+      }
+
+      const validation = geminiComparisonResponseSchema.safeParse(parsedJson);
+      if (!validation.success) {
+        throw new Error(
+          `Gemini response failed schema validation: ${JSON.stringify(
+            validation.error.flatten().fieldErrors
+          )}`
+        );
+      }
+
+      return validation.data;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  // Attempt 1
+  try {
+    return await runCall();
+  } catch (firstError) {
+    console.warn(
+      "[Gemini] First comparison attempt failed, waiting 1500ms and retrying once...",
+      firstError instanceof Error ? firstError.message : firstError
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Attempt 2 (Retry)
+    try {
+      return await runCall();
+    } catch (secondError) {
+      console.error(
+        "[Gemini] Second comparison attempt failed:",
+        secondError instanceof Error ? secondError.message : secondError
+      );
       throw new Error(
-        `Failed to parse Gemini response as JSON: ${
-          parseError instanceof Error ? parseError.message : String(parseError)
+        `Visual comparison failed: ${
+          secondError instanceof Error ? secondError.message : "Service unavailable"
         }`
       );
     }
-
-    const validationResult = schema.safeParse(parsedJson);
-    if (!validationResult.success) {
-      throw new Error(
-        `Gemini response failed schema validation: ${JSON.stringify(
-          validationResult.error.flatten().fieldErrors
-        )}`
-      );
-    }
-
-    return validationResult.data;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("timed out")) {
-      throw error;
-    }
-    throw new Error(
-      `Gemini generation failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  } finally {
-    clearTimeout(timeoutId);
   }
 }

@@ -71,12 +71,30 @@ export const registerPhotoSchema = z.object({
 });
 
 export type RegisterPhotoInput = z.infer<typeof registerPhotoSchema>;
-
-/**
- * Legacy schema alias for backward compatibility.
- */
 export const createPhotoSchema = registerPhotoSchema;
 export type CreatePhotoInput = RegisterPhotoInput;
+
+/**
+ * Validation schema for triggering a comparison between move-in and move-out photos.
+ */
+export const createComparisonSchema = z.object({
+  propertyId: z.string().uuid("Invalid property ID"),
+  area: z.string().trim().min(1, "Area name is required").max(100, "Area name is too long"),
+});
+
+export type CreateComparisonInput = z.infer<typeof createComparisonSchema>;
+
+/**
+ * Validation schema for updating a finding's decision (accept / dispute).
+ */
+export const updateFindingDecisionSchema = z.object({
+  decision: z.enum(["accepted", "disputed"], {
+    errorMap: () => ({ message: "Decision must be either 'accepted' or 'disputed'" }),
+  }),
+  note: z.string().trim().max(500, "Note must not exceed 500 characters").optional().nullable(),
+});
+
+export type UpdateFindingDecisionInput = z.infer<typeof updateFindingDecisionSchema>;
 
 /**
  * Validation schema for authentication (login/signup).

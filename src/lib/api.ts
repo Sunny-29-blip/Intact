@@ -4,12 +4,15 @@ import type {
   Property,
   PhotoWithUrl,
   Inspection,
+  ComparisonWithFindings,
+  Finding,
   ApiResponse,
 } from "@/types/database";
 import type {
   CreatePropertyInput,
   UpdatePropertyInput,
   RegisterPhotoInput,
+  UpdateFindingDecisionInput,
 } from "@/lib/validation";
 
 class ApiError extends Error {
@@ -98,6 +101,29 @@ export const api = {
   async deletePhoto(id: string): Promise<{ deleted: boolean }> {
     return request<{ deleted: boolean }>(`/api/photos/${id}`, {
       method: "DELETE",
+    });
+  },
+
+  // Comparisons
+  async triggerComparison(propertyId: string, area: string): Promise<ComparisonWithFindings> {
+    return request<ComparisonWithFindings>("/api/comparisons", {
+      method: "POST",
+      body: JSON.stringify({ propertyId, area }),
+    });
+  },
+
+  async getComparisons(propertyId: string): Promise<ComparisonWithFindings[]> {
+    return request<ComparisonWithFindings[]>(`/api/comparisons?propertyId=${encodeURIComponent(propertyId)}`);
+  },
+
+  // Findings
+  async updateFindingDecision(
+    id: string,
+    data: UpdateFindingDecisionInput
+  ): Promise<Finding> {
+    return request<Finding>(`/api/findings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
     });
   },
 };

@@ -70,6 +70,12 @@ export interface Finding {
   created_at: string;
 }
 
+export interface ComparisonWithFindings extends Comparison {
+  findings: Finding[];
+  move_in_photo?: PhotoWithUrl | null;
+  move_out_photo?: PhotoWithUrl | null;
+}
+
 export interface InspectionWithPhotos extends Inspection {
   photos: PhotoWithUrl[];
 }

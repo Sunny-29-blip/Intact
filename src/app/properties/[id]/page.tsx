@@ -7,7 +7,12 @@ import { supabase } from "@/lib/supabase/client";
 import { api, ApiError } from "@/lib/api";
 import { uploadAndRegisterPhoto } from "@/lib/client-photo";
 import { updatePropertySchema, type UpdatePropertyInput } from "@/lib/validation";
-import type { PropertyDetail, PhotoWithUrl } from "@/types/database";
+import { AreaComparisonCard } from "@/components/AreaComparisonCard";
+import type {
+  PropertyDetail,
+  PhotoWithUrl,
+  ComparisonWithFindings,
+} from "@/types/database";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -18,6 +23,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
   const router = useRouter();
 
   const [property, setProperty] = useState<PropertyDetail | null>(null);
+  const [comparisons, setComparisons] = useState<ComparisonWithFindings[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -53,7 +59,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
   // Delete photo state
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
 
-  const fetchProperty = async () => {
+  const fetchPropertyAndComparisons = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -63,15 +69,21 @@ export default function PropertyDetailPage({ params }: PageProps) {
       if (user) {
         setUserId(user.id);
       }
-      const data = await api.getProperty(propertyId);
-      setProperty(data);
+
+      const [propData, compData] = await Promise.all([
+        api.getProperty(propertyId),
+        api.getComparisons(propertyId).catch(() => [] as ComparisonWithFindings[]),
+      ]);
+
+      setProperty(propData);
+      setComparisons(compData);
 
       // Populate edit fields
-      setEditName(data.name);
-      setEditAddress(data.address || "");
-      setEditTenancyStart(data.tenancy_start);
-      setEditTenancyEnd(data.tenancy_end || "");
-      setEditLeaseNotes(data.lease_notes || "");
+      setEditName(propData.name);
+      setEditAddress(propData.address || "");
+      setEditTenancyStart(propData.tenancy_start);
+      setEditTenancyEnd(propData.tenancy_end || "");
+      setEditLeaseNotes(propData.lease_notes || "");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -84,10 +96,10 @@ export default function PropertyDetailPage({ params }: PageProps) {
   };
 
   useEffect(() => {
-    fetchProperty();
+    fetchPropertyAndComparisons();
   }, [propertyId]);
 
-  // Derived lists of photos
+  // Derived photo collections
   const moveInPhotos = useMemo(
     () => property?.inspections.move_in?.photos || [],
     [property]
@@ -97,29 +109,29 @@ export default function PropertyDetailPage({ params }: PageProps) {
     [property]
   );
 
-  // Available unique areas from move-in photos for move-out selection
+  // Unique areas defined in move-in
   const availableMoveInAreas = useMemo(() => {
     const set = new Set<string>();
     moveInPhotos.forEach((p) => set.add(p.area));
     return Array.from(set).sort();
   }, [moveInPhotos]);
 
-  // Combined areas for side-by-side comparison pairing
+  // Grouped areas for comparison mapping
   const pairedAreas = useMemo(() => {
     const map = new Map<
       string,
-      { area: string; moveIn: PhotoWithUrl[]; moveOut: PhotoWithUrl[] }
+      { area: string; moveIn?: PhotoWithUrl; moveOut?: PhotoWithUrl }
     >();
 
     moveInPhotos.forEach((p) => {
-      const entry = map.get(p.area) || { area: p.area, moveIn: [], moveOut: [] };
-      entry.moveIn.push(p);
+      const entry = map.get(p.area) || { area: p.area };
+      entry.moveIn = p;
       map.set(p.area, entry);
     });
 
     moveOutPhotos.forEach((p) => {
-      const entry = map.get(p.area) || { area: p.area, moveIn: [], moveOut: [] };
-      entry.moveOut.push(p);
+      const entry = map.get(p.area) || { area: p.area };
+      entry.moveOut = p;
       map.set(p.area, entry);
     });
 
@@ -149,7 +161,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
     try {
       await api.updateProperty(propertyId, payload);
       setShowEditModal(false);
-      await fetchProperty();
+      await fetchPropertyAndComparisons();
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : "Failed to update property.");
     } finally {
@@ -200,11 +212,10 @@ export default function PropertyDetailPage({ params }: PageProps) {
         onProgress: (status) => setMoveInStatusText(status),
       });
 
-      // Clear form
       setMoveInArea("");
       setMoveInFile(null);
       setMoveInStatusText(null);
-      await fetchProperty();
+      await fetchPropertyAndComparisons();
     } catch (err) {
       setMoveInError(err instanceof Error ? err.message : "Failed to upload photo.");
     } finally {
@@ -243,11 +254,10 @@ export default function PropertyDetailPage({ params }: PageProps) {
         onProgress: (status) => setMoveOutStatusText(status),
       });
 
-      // Clear form
       setMoveOutArea("");
       setMoveOutFile(null);
       setMoveOutStatusText(null);
-      await fetchProperty();
+      await fetchPropertyAndComparisons();
     } catch (err) {
       setMoveOutError(err instanceof Error ? err.message : "Failed to upload photo.");
     } finally {
@@ -265,7 +275,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
     setDeletingPhotoId(photoId);
     try {
       await api.deletePhoto(photoId);
-      await fetchProperty();
+      await fetchPropertyAndComparisons();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete photo");
     } finally {
@@ -273,12 +283,26 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
-  const formatSha = (sha: string) => {
-    if (!sha || sha.length < 12) return sha;
+  // Callback when a comparison is triggered or updated
+  const handleComparisonUpdated = (updated: ComparisonWithFindings) => {
+    setComparisons((prev) => {
+      const existingIdx = prev.findIndex((c) => c.area === updated.area);
+      if (existingIdx >= 0) {
+        const next = [...prev];
+        next[existingIdx] = updated;
+        return next;
+      }
+      return [...prev, updated];
+    });
+  };
+
+  const formatSha = (sha?: string) => {
+    if (!sha || sha.length < 12) return sha || "—";
     return `${sha.slice(0, 6)}...${sha.slice(-6)}`;
   };
 
-  const formatDate = (iso: string) => {
+  const formatDate = (iso?: string) => {
+    if (!iso) return "—";
     try {
       return new Date(iso).toLocaleString("en-US", {
         month: "short",
@@ -294,14 +318,14 @@ export default function PropertyDetailPage({ params }: PageProps) {
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {/* Breadcrumb & Navigation */}
+      {/* Breadcrumb */}
       <div className="flex items-center space-x-2 text-xs text-ink-500 mb-4">
         <Link href="/properties" className="hover:text-ink-900 underline">
           Properties
         </Link>
         <span>/</span>
         <span className="text-ink-900 font-medium truncate max-w-xs">
-          {property?.name || "Inspection Record"}
+          {property?.name || "Inspection Dossier"}
         </span>
       </div>
 
@@ -319,7 +343,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
         <div className="p-4 bg-damage-bg border border-damage-border rounded text-xs text-damage mb-6 flex items-center justify-between">
           <span>{error}</span>
           <button
-            onClick={fetchProperty}
+            onClick={fetchPropertyAndComparisons}
             className="underline font-medium hover:text-damage"
           >
             Retry
@@ -376,9 +400,9 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-ink-500 uppercase">Move-out Verification</span>
+                <span className="block font-mono text-ink-500 uppercase">Move-out Paired</span>
                 <span className="font-semibold text-ink-900 mt-0.5 block">
-                  {moveOutPhotos.length} photo{moveOutPhotos.length === 1 ? "" : "s"} paired
+                  {moveOutPhotos.length} of {availableMoveInAreas.length} areas paired
                 </span>
               </div>
             </div>
@@ -393,12 +417,12 @@ export default function PropertyDetailPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* Section 1: Move-In Inspection (Baseline) */}
+          {/* Section 1: Move-In Baseline Upload & Catalog */}
           <section className="bg-white border border-ink-200 rounded p-6 sm:p-8 mb-8">
             <div className="border-b border-ink-100 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <div className="text-xs font-mono uppercase text-ink-500">
-                  Stage 1: Arrival Condition
+                  Stage 1: Baseline Recording
                 </div>
                 <h2 className="text-xl font-bold text-ink-900">
                   Move-In Baseline Photos
@@ -409,13 +433,13 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </span>
             </div>
 
-            {/* Move-in upload box */}
+            {/* Move-in upload form */}
             <div className="bg-paper-50 border border-ink-200 rounded p-4 sm:p-5 mb-6 text-xs">
               <h3 className="font-semibold text-ink-900 mb-1">
                 Archive a Move-In Area Photo
               </h3>
               <p className="text-ink-600 mb-4">
-                Enter the specific room or area label and select a high-resolution photo.
+                Enter an area label and upload a clear baseline photo.
               </p>
 
               {moveInError && (
@@ -427,13 +451,13 @@ export default function PropertyDetailPage({ params }: PageProps) {
               <form onSubmit={handleMoveInUpload} className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <div className="md:col-span-5">
                   <label className="block font-medium text-ink-700 mb-1">
-                    Area Description <span className="text-damage">*</span>
+                    Area Label <span className="text-damage">*</span>
                   </label>
                   <input
                     type="text"
                     value={moveInArea}
                     onChange={(e) => setMoveInArea(e.target.value)}
-                    placeholder="e.g. Master Bedroom — East Wall"
+                    placeholder="e.g. Living Room — North Wall"
                     disabled={moveInUploading}
                     className="w-full px-3 py-2 border border-ink-200 rounded bg-white focus:outline-none focus:border-accent"
                   />
@@ -441,7 +465,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
 
                 <div className="md:col-span-4">
                   <label className="block font-medium text-ink-700 mb-1">
-                    Photo File <span className="text-damage">*</span>
+                    Baseline Photo <span className="text-damage">*</span>
                   </label>
                   <input
                     type="file"
@@ -464,10 +488,10 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </form>
             </div>
 
-            {/* Move-in photo gallery */}
+            {/* Move-in gallery */}
             {moveInPhotos.length === 0 ? (
               <div className="text-center py-8 border border-dashed border-ink-200 rounded text-xs text-ink-500">
-                No move-in photos archived yet. Photograph your property areas above to establish baseline conditions.
+                No move-in photos archived yet. Establish baseline photos above.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -514,26 +538,26 @@ export default function PropertyDetailPage({ params }: PageProps) {
             )}
           </section>
 
-          {/* Section 2: Move-Out Inspection & Side-by-Side Comparison Pairing */}
+          {/* Section 2: Move-Out Upload & Visual Difference Analysis */}
           <section className="bg-white border border-ink-200 rounded p-6 sm:p-8">
             <div className="border-b border-ink-100 pb-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <div className="text-xs font-mono uppercase text-ink-500">
-                  Stage 2: Departure Verification
+                  Stage 2: Departure Verification & AI Difference Analysis
                 </div>
                 <h2 className="text-xl font-bold text-ink-900">
-                  Move-Out Pairing & Comparison
+                  Move-Out Pairing & Findings Review
                 </h2>
               </div>
               <span className="text-xs font-mono text-ink-500">
-                {moveOutPhotos.length} / {availableMoveInAreas.length} areas paired
+                {moveOutPhotos.length} / {availableMoveInAreas.length} paired
               </span>
             </div>
 
-            {/* Move-out upload box */}
+            {/* Move-out upload form */}
             {availableMoveInAreas.length === 0 ? (
               <div className="p-4 bg-paper-100 border border-ink-200 rounded text-xs text-ink-600 mb-6">
-                <strong>Move-out photos require a baseline:</strong> Please upload move-in photos in the section above first. Once baseline areas exist, you can photograph corresponding departure conditions.
+                <strong>Move-out photos require a baseline:</strong> Please upload move-in photos in the section above first.
               </div>
             ) : (
               <div className="bg-paper-50 border border-ink-200 rounded p-4 sm:p-5 mb-8 text-xs">
@@ -541,7 +565,7 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   Upload Matching Move-Out Photo
                 </h3>
                 <p className="text-ink-600 mb-4">
-                  Select an area that already exists in your move-in baseline to form an exact before-and-after pair.
+                  Select an area that exists in your move-in baseline to pair with departure condition.
                 </p>
 
                 {moveOutError && (
@@ -596,133 +620,27 @@ export default function PropertyDetailPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Side-by-side Pairs list */}
+            {/* List of Area Comparison Cards */}
             {pairedAreas.length === 0 ? (
               <div className="text-center py-8 border border-dashed border-ink-200 rounded text-xs text-ink-500">
-                No inspection pairs established yet.
+                No area photo pairs established yet.
               </div>
             ) : (
-              <div className="space-y-6">
-                {pairedAreas.map((group) => {
-                  const moveInPhoto = group.moveIn[0];
-                  const moveOutPhoto = group.moveOut[0];
-                  const isPaired = Boolean(moveInPhoto && moveOutPhoto);
-
+              <div>
+                {pairedAreas.map((item) => {
+                  const comp = comparisons.find((c) => c.area === item.area);
                   return (
-                    <div
-                      key={group.area}
-                      className="border border-ink-200 rounded bg-paper-50 p-4 sm:p-5"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-ink-200 pb-3 mb-4 gap-2">
-                        <div>
-                          <span className="text-[10px] font-mono uppercase text-ink-500">
-                            Condition Pair
-                          </span>
-                          <h3 className="text-base font-bold text-ink-900">
-                            {group.area}
-                          </h3>
-                        </div>
-
-                        {/* Placeholder button per paired area */}
-                        {isPaired ? (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-[11px] font-mono px-2 py-0.5 bg-accepted-bg border border-accepted-border text-accepted rounded">
-                              ✓ Paired
-                            </span>
-                            <button
-                              disabled
-                              title="Gemini visual difference comparison will be enabled in the next phase"
-                              className="px-3 py-1.5 text-xs font-mono font-medium border border-ink-300 text-ink-500 bg-paper-100 rounded cursor-not-allowed"
-                            >
-                              Compare (AI Analysis)
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] font-mono px-2 py-0.5 bg-wear-bg border border-wear-border text-wear rounded">
-                            Awaiting Move-Out Photo
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Side-by-side photo grid (stacks on mobile) */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Move-In Photo (Left) */}
-                        <div className="border border-ink-200 rounded bg-white p-3">
-                          <div className="flex items-center justify-between text-xs font-semibold text-ink-700 mb-2">
-                            <span>MOVE-IN BASELINE</span>
-                            {moveInPhoto && (
-                              <button
-                                onClick={() => handleDeletePhoto(moveInPhoto.id)}
-                                disabled={deletingPhotoId === moveInPhoto.id}
-                                className="text-[10px] text-damage hover:underline"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                          {moveInPhoto ? (
-                            <div>
-                              <div className="aspect-[4/3] bg-paper-100 rounded overflow-hidden mb-2">
-                                <img
-                                  src={moveInPhoto.signed_url}
-                                  alt={`Move-in ${group.area}`}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              </div>
-                              <div className="text-[11px] font-mono text-ink-600 flex justify-between">
-                                <span>{formatDate(moveInPhoto.created_at)}</span>
-                                <span title={moveInPhoto.sha256}>
-                                  SHA: {formatSha(moveInPhoto.sha256)}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="aspect-[4/3] border border-dashed border-ink-200 rounded flex items-center justify-center text-xs text-ink-400">
-                              Missing baseline photo
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Move-Out Photo (Right) */}
-                        <div className="border border-ink-200 rounded bg-white p-3">
-                          <div className="flex items-center justify-between text-xs font-semibold text-ink-700 mb-2">
-                            <span>MOVE-OUT DEPARTURE</span>
-                            {moveOutPhoto && (
-                              <button
-                                onClick={() => handleDeletePhoto(moveOutPhoto.id)}
-                                disabled={deletingPhotoId === moveOutPhoto.id}
-                                className="text-[10px] text-damage hover:underline"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                          {moveOutPhoto ? (
-                            <div>
-                              <div className="aspect-[4/3] bg-paper-100 rounded overflow-hidden mb-2">
-                                <img
-                                  src={moveOutPhoto.signed_url}
-                                  alt={`Move-out ${group.area}`}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              </div>
-                              <div className="text-[11px] font-mono text-ink-600 flex justify-between">
-                                <span>{formatDate(moveOutPhoto.created_at)}</span>
-                                <span title={moveOutPhoto.sha256}>
-                                  SHA: {formatSha(moveOutPhoto.sha256)}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="aspect-[4/3] border border-dashed border-ink-200 rounded flex items-center justify-center text-xs text-ink-400">
-                              Departure photo not yet uploaded
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <AreaComparisonCard
+                      key={item.area}
+                      propertyId={propertyId}
+                      area={item.area}
+                      moveInPhoto={item.moveIn}
+                      moveOutPhoto={item.moveOut}
+                      comparison={comp}
+                      onComparisonUpdated={handleComparisonUpdated}
+                      onDeletePhoto={handleDeletePhoto}
+                      deletingPhotoId={deletingPhotoId}
+                    />
                   );
                 })}
               </div>
