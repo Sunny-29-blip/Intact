@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { api, ApiError } from "@/lib/api";
 import { updateProfileSchema } from "@/lib/validation";
-import type { Profile, TenantLinkedOwnerProperty, OwnerProperty } from "@/types/database";
+import type { Profile, PropertyListItem, OwnerProperty } from "@/types/database";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -15,12 +15,13 @@ export default function ProfilePage() {
 
   // Name editing
   const [displayName, setDisplayName] = useState("");
+  const [contact, setContact] = useState({ phone: "", address_line: "", city: "", state: "", pincode: "" });
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Role specific context data
-  const [tenantLinks, setTenantLinks] = useState<TenantLinkedOwnerProperty[]>([]);
+  const [tenantProperties, setTenantProperties] = useState<PropertyListItem[]>([]);
   const [ownerProperties, setOwnerProperties] = useState<OwnerProperty[]>([]);
 
   const loadData = async () => {
@@ -38,10 +39,17 @@ export default function ProfilePage() {
       const prof = await api.getProfile();
       setProfile(prof);
       setDisplayName(prof.display_name || "");
+      setContact({
+        phone: prof.phone || "",
+        address_line: prof.address_line || "",
+        city: prof.city || "",
+        state: prof.state || "",
+        pincode: prof.pincode || "",
+      });
 
       if (prof.role === "tenant") {
-        const links = await api.getTenantLinks().catch(() => []);
-        setTenantLinks(links);
+        const props = await api.getProperties().catch(() => []);
+        setTenantProperties(props);
       } else if (prof.role === "owner") {
         const props = await api.getOwnerProperties().catch(() => []);
         setOwnerProperties(props);
@@ -66,29 +74,41 @@ export default function ProfilePage() {
     setSaveError(null);
     setSaveSuccess(false);
 
-    const validation = updateProfileSchema.safeParse({
+    const payload = {
       display_name: displayName.trim() || null,
-    });
+      phone: contact.phone.trim() || null,
+      address_line: contact.address_line.trim() || null,
+      city: contact.city.trim() || null,
+      state: contact.state.trim() || null,
+      pincode: contact.pincode.trim() || null,
+    };
+    const validation = updateProfileSchema.safeParse(payload);
 
     if (!validation.success) {
-      setSaveError(validation.error.flatten().fieldErrors.display_name?.[0] || "Invalid display name.");
+      const firstError = Object.values(validation.error.flatten().fieldErrors).flat()[0];
+      setSaveError(firstError || "Check the details and try again.");
       return;
     }
 
     setSaving(true);
     try {
-      const updated = await api.updateProfile({
-        display_name: displayName.trim() || null,
-      });
+      const updated = await api.updateProfile(payload);
       setProfile(updated);
       setDisplayName(updated.display_name || "");
+      setContact({
+        phone: updated.phone || "",
+        address_line: updated.address_line || "",
+        city: updated.city || "",
+        state: updated.state || "",
+        pincode: updated.pincode || "",
+      });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       if (err instanceof ApiError) {
         setSaveError(err.message);
       } else {
-        setSaveError("Failed to update profile name.");
+        setSaveError("We could not save your details. Try again.");
       }
     } finally {
       setSaving(false);
@@ -147,7 +167,7 @@ export default function ProfilePage() {
 
             {saveSuccess && (
               <div className="mb-4 p-3 bg-accepted-bg border border-accepted-border text-accepted font-mono text-xs">
-                [✓] Profile display name updated successfully.
+                [✓] Your details were saved.
               </div>
             )}
 
@@ -215,13 +235,40 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
+                {([
+                  ["phone", "Phone", "e.g. +91 98765 43210", "tel"],
+                  ["address_line", "Address", "Flat, building, street", "text"],
+                  ["city", "City", "e.g. Bengaluru", "text"],
+                  ["state", "State", "e.g. Karnataka", "text"],
+                  ["pincode", "PIN code", "e.g. 560001", "text"],
+                ] as const).map(([key, label, placeholder, type]) => (
+                  <div key={key}>
+                    <label
+                      htmlFor={`profile-${key}`}
+                      className="block font-mono font-medium text-ink-700 uppercase tracking-wider mb-1"
+                    >
+                      {label}
+                    </label>
+                    <input
+                      id={`profile-${key}`}
+                      type={type}
+                      inputMode={key === "pincode" ? "numeric" : undefined}
+                      value={contact[key]}
+                      onChange={(e) => setContact((c) => ({ ...c, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      disabled={saving}
+                      className="w-full px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent font-sans text-xs"
+                    />
+                  </div>
+                ))}
+
                 <div className="flex justify-end pt-2">
                   <button
                     type="submit"
-                    disabled={saving || displayName === (profile.display_name || "")}
+                    disabled={saving}
                     className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider font-mono text-xs transition-colors disabled:opacity-40 btn-motion lit-dark"
                   >
-                    {saving ? "Saving..." : "Save Name"}
+                    {saving ? "Saving..." : "Save details"}
                   </button>
                 </div>
               </form>
@@ -236,7 +283,7 @@ export default function ProfilePage() {
                   ROLE OVERVIEW · {profile.role.toUpperCase()}
                 </div>
                 <h2 className="text-base font-bold text-ink-900 mt-0.5">
-                  {profile.role === "owner" ? "Registered Properties" : "Linked Owner Properties"}
+                  {profile.role === "owner" ? "Your properties" : "Your flats"}
                 </h2>
               </div>
               <Link
@@ -285,7 +332,7 @@ export default function ProfilePage() {
                           href={`/owner/properties/${p.id}`}
                           className="text-xs font-mono text-accent hover:underline font-semibold"
                         >
-                          View →
+                          Edit →
                         </Link>
                       </div>
                     ))}
@@ -294,44 +341,40 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="space-y-4 text-xs">
-                {tenantLinks.length === 0 ? (
+                {tenantProperties.length === 0 ? (
                   <div className="p-6 bg-page border border-dashed border-ink-200 text-center font-mono text-ink-500">
-                    No properties currently linked to an owner. You can link any property from its detail page using the owner's join code.
+                    No flats added yet. Add one from your Properties page.
                   </div>
                 ) : (
                   <div className="border border-ink-200 divide-y divide-ink-100">
-                    {tenantLinks.map((link) => (
+                    {tenantProperties.map((p) => (
                       <div
-                        key={link.link_id}
+                        key={p.id}
                         className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-page transition-colors"
                       >
                         <div>
-                          <div className="font-semibold text-ink-900">
-                            {link.name}
-                          </div>
-                          {(link.address || link.city) && (
-                            <div className="text-[11px] text-ink-600 mt-0.5">
-                              {[link.address, link.city]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </div>
+                          <div className="font-semibold text-ink-900">{p.name}</div>
+                          {p.address && (
+                            <div className="text-[11px] text-ink-600 mt-0.5">{p.address}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span
-                            className={`px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${
-                              link.shared
-                                ? "bg-accepted-bg text-accepted border-accepted-border"
-                                : "bg-page text-ink-500 border-ink-200"
-                            }`}
-                          >
-                            {link.shared ? "REPORT SHARED" : "NOT SHARED"}
-                          </span>
+                          {p.linked_owner_property && (
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-mono uppercase font-semibold border ${
+                                p.linked_owner_property.shared
+                                  ? "bg-accepted-bg text-accepted border-accepted-border"
+                                  : "bg-page text-ink-500 border-ink-200"
+                              }`}
+                            >
+                              {p.linked_owner_property.shared ? "REPORT SHARED" : "NOT SHARED"}
+                            </span>
+                          )}
                           <Link
-                            href={`/properties/${link.tenant_property_id}`}
+                            href={`/properties/${p.id}`}
                             className="text-xs font-mono text-accent hover:underline font-semibold"
                           >
-                            Open Property →
+                            Edit flat →
                           </Link>
                         </div>
                       </div>

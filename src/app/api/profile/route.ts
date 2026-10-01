@@ -145,12 +145,19 @@ export async function PATCH(request: NextRequest) {
       return apiError("VALIDATION_ERROR", "Invalid profile input", 400, validation.error.flatten().fieldErrors);
     }
 
-    const { display_name } = validation.data;
+    // Only send fields the client provided; empty strings are stored as null.
+    const updates: Record<string, string | null> = {};
+    for (const [key, value] of Object.entries(validation.data)) {
+      if (value !== undefined) updates[key] = value === "" ? null : value;
+    }
+    if (Object.keys(updates).length === 0) {
+      return apiError("VALIDATION_ERROR", "Nothing to update", 400);
+    }
     const adminSupabase = createAdminClient();
 
     const { data: updated, error: updateError } = await adminSupabase
       .from("profiles")
-      .update({ display_name })
+      .update(updates)
       .eq("user_id", user.id)
       .select()
       .single();
