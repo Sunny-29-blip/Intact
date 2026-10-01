@@ -33,6 +33,9 @@ export async function createClient() {
   );
 }
 
+export const createServerClient_custom = createClient;
+export { createClient as createServerClient };
+
 /**
  * Creates an admin Supabase client using the secret key (Service Role).
  * Server-only; bypasses Row Level Security for authorized administrative tasks.

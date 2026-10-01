@@ -1,6 +1,68 @@
 import { z } from "zod";
 
 /**
+ * Validation schema for creating a user profile.
+ */
+export const createProfileSchema = z.object({
+  role: z.enum(["tenant", "owner"], {
+    errorMap: () => ({ message: "Role must be 'tenant' or 'owner'" }),
+  }),
+  display_name: z.string().trim().max(100, "Name is too long").optional().nullable(),
+});
+
+export type CreateProfileInput = z.infer<typeof createProfileSchema>;
+
+/**
+ * Validation schema for updating user profile.
+ */
+export const updateProfileSchema = z.object({
+  display_name: z.string().trim().min(1, "Display name cannot be empty").max(100, "Name is too long").optional().nullable(),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * Validation schema for creating an owner property.
+ */
+export const createOwnerPropertySchema = z.object({
+  name: z.string().trim().min(1, "Property name is required").max(150, "Property name is too long"),
+  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
+  city: z.string().trim().max(100, "City is too long").optional().nullable(),
+});
+
+export type CreateOwnerPropertyInput = z.infer<typeof createOwnerPropertySchema>;
+
+/**
+ * Validation schema for updating an owner property.
+ */
+export const updateOwnerPropertySchema = z.object({
+  name: z.string().trim().min(1, "Property name is required").max(150, "Property name is too long").optional(),
+  address: z.string().trim().max(500, "Address is too long").optional().nullable(),
+  city: z.string().trim().max(100, "City is too long").optional().nullable(),
+});
+
+export type UpdateOwnerPropertyInput = z.infer<typeof updateOwnerPropertySchema>;
+
+/**
+ * Validation schema for linking a tenant property to an owner property.
+ */
+export const linkTenancySchema = z.object({
+  joinCode: z.string().trim().min(6, "Join code must be at least 6 characters").max(20, "Join code is too long"),
+  propertyId: z.string().uuid("Invalid property ID"),
+});
+
+export type LinkTenancyInput = z.infer<typeof linkTenancySchema>;
+
+/**
+ * Validation schema for updating tenancy link sharing status.
+ */
+export const updateLinkShareSchema = z.object({
+  shared: z.boolean(),
+});
+
+export type UpdateLinkShareInput = z.infer<typeof updateLinkShareSchema>;
+
+/**
  * Validation schema for creating a new property.
  */
 export const createPropertySchema = z.object({
@@ -85,11 +147,11 @@ export const createComparisonSchema = z.object({
 export type CreateComparisonInput = z.infer<typeof createComparisonSchema>;
 
 /**
- * Validation schema for updating a finding's decision (accept / dispute).
+ * Validation schema for updating a finding's decision (accept / dispute / pending).
  */
 export const updateFindingDecisionSchema = z.object({
-  decision: z.enum(["accepted", "disputed"], {
-    errorMap: () => ({ message: "Decision must be either 'accepted' or 'disputed'" }),
+  decision: z.enum(["accepted", "disputed", "pending"], {
+    errorMap: () => ({ message: "Decision must be 'accepted', 'disputed', or 'pending'" }),
   }),
   note: z.string().trim().max(500, "Note must not exceed 500 characters").optional().nullable(),
 });

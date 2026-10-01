@@ -51,6 +51,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Role-based route guards for authenticated sessions
+  if (user && !pathname.startsWith("/api")) {
+    // If accessing role-specific routes, check profile role
+    if (pathname.startsWith("/properties") || pathname.startsWith("/owner")) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const userRole = profile?.role || "tenant";
+
+      if (userRole === "owner" && pathname.startsWith("/properties")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/owner";
+        return NextResponse.redirect(url);
+      }
+
+      if (userRole === "tenant" && pathname.startsWith("/owner")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/properties";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return supabaseResponse;
 }
 

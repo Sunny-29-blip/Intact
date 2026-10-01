@@ -12,6 +12,7 @@ import type {
   PropertyDetail,
   PhotoWithUrl,
   ComparisonWithFindings,
+  TenantLinkedOwnerProperty,
 } from "@/types/database";
 
 interface PageProps {
@@ -24,10 +25,20 @@ export default function PropertyDetailPage({ params }: PageProps) {
 
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [comparisons, setComparisons] = useState<ComparisonWithFindings[]>([]);
+  const [tenancyLink, setTenancyLink] = useState<TenantLinkedOwnerProperty | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [copiedShare, setCopiedShare] = useState(false);
+
+  // Link to owner property state
+  const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [linkingOwner, setLinkingOwner] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+  const [updatingShare, setUpdatingShare] = useState(false);
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
 
   // Edit property state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -71,13 +82,17 @@ export default function PropertyDetailPage({ params }: PageProps) {
         setUserId(user.id);
       }
 
-      const [propData, compData] = await Promise.all([
+      const [propData, compData, linksData] = await Promise.all([
         api.getProperty(propertyId),
         api.getComparisons(propertyId).catch(() => [] as ComparisonWithFindings[]),
+        api.getTenantLinks().catch(() => [] as TenantLinkedOwnerProperty[]),
       ]);
 
       setProperty(propData);
       setComparisons(compData);
+
+      const existingLink = linksData.find((l) => l.tenant_property_id === propertyId);
+      setTenancyLink(existingLink || null);
 
       // Populate edit fields
       setEditName(propData.name);
@@ -93,6 +108,65 @@ export default function PropertyDetailPage({ params }: PageProps) {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLinkOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLinkError(null);
+    setLinkSuccess(null);
+
+    const cleanCode = joinCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setLinkError("Please enter an 8-character join code.");
+      return;
+    }
+
+    setLinkingOwner(true);
+    try {
+      const newLink = await api.linkTenancy({
+        joinCode: cleanCode,
+        propertyId,
+      });
+      setTenancyLink(newLink);
+      setJoinCodeInput("");
+      setLinkSuccess(`Successfully linked to ${newLink.name}`);
+      setTimeout(() => setLinkSuccess(null), 4000);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setLinkError(err.message);
+      } else {
+        setLinkError("Code not recognised. Please check with your property owner.");
+      }
+    } finally {
+      setLinkingOwner(false);
+    }
+  };
+
+  const handleToggleShare = async () => {
+    if (!tenancyLink) return;
+    setUpdatingShare(true);
+    try {
+      const updated = await api.updateLinkShare(tenancyLink.link_id, !tenancyLink.shared);
+      setTenancyLink((prev) => (prev ? { ...prev, shared: updated.shared } : null));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to update sharing preference.");
+    } finally {
+      setUpdatingShare(false);
+    }
+  };
+
+  const handleUnlink = async () => {
+    if (!tenancyLink) return;
+    setUnlinking(true);
+    try {
+      await api.unlinkTenancy(tenancyLink.link_id);
+      setTenancyLink(null);
+      setShowUnlinkModal(false);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to unlink property.");
+    } finally {
+      setUnlinking(false);
     }
   };
 
@@ -471,6 +545,131 @@ export default function PropertyDetailPage({ params }: PageProps) {
                   Lease Terms / Notes:
                 </span>
                 <span className="font-sans">{property.lease_notes}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Section: Linked Owner Property */}
+          <div className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">
+            <div className="border-b border-ink-200 pb-4 mb-5">
+              <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                OWNER INTEGRATION · {tenancyLink ? "LINKED" : "UNLINKED"}
+              </div>
+              <h2 className="text-lg font-bold text-ink-900 mt-0.5">
+                Linked Owner Property
+              </h2>
+            </div>
+
+            {linkSuccess && (
+              <div className="mb-4 p-3 bg-accepted-bg border border-accepted-border text-accepted font-mono text-xs">
+                [✓] {linkSuccess}
+              </div>
+            )}
+
+            {tenancyLink ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-page border border-ink-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                      REGISTERED OWNER PROPERTY
+                    </div>
+                    <div className="text-sm font-bold text-ink-900 mt-0.5">
+                      {tenancyLink.name}
+                    </div>
+                    {(tenancyLink.address || tenancyLink.city) && (
+                      <div className="text-ink-600 text-xs mt-0.5">
+                        {[tenancyLink.address, tenancyLink.city]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </div>
+                    )}
+                    <div className="text-[10px] font-mono text-ink-500 mt-1">
+                      Linked on{" "}
+                      {new Date(tenancyLink.linked_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowUnlinkModal(true)}
+                    className="px-3 py-2 border border-damage-border hover:bg-damage-bg text-damage text-xs font-semibold uppercase tracking-wider font-mono transition-colors self-start sm:self-auto btn-motion"
+                  >
+                    Unlink Property
+                  </button>
+                </div>
+
+                {/* Share switch */}
+                <div className="p-4 border border-ink-200 bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-ink-900 flex items-center gap-2">
+                      <span>Share this report with the owner</span>
+                      <span
+                        className={`text-[10px] font-mono uppercase px-1.5 py-0.2 border ${
+                          tenancyLink.shared
+                            ? "bg-accepted-bg text-accepted border-accepted-border font-bold"
+                            : "bg-page text-ink-500 border-ink-200"
+                        }`}
+                      >
+                        {tenancyLink.shared ? "ENABLED" : "OFF"}
+                      </span>
+                    </div>
+                    <p className="text-ink-600 text-xs">
+                      The owner can open your read-only condition report. They never receive raw access to private photos or email.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleShare}
+                    disabled={updatingShare}
+                    className={`px-4 py-2 text-xs font-semibold uppercase font-mono tracking-wider transition-colors disabled:opacity-50 whitespace-nowrap btn-motion ${
+                      tenancyLink.shared
+                        ? "bg-accepted-bg hover:bg-accepted-border text-accepted border border-accepted-border"
+                        : "bg-accent hover:bg-accent-hover text-white lit-dark"
+                    }`}
+                  >
+                    {updatingShare
+                      ? "Updating..."
+                      : tenancyLink.shared
+                      ? "Revoke Owner Report"
+                      : "Share Report with Owner"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <p className="text-ink-600 leading-relaxed max-w-2xl">
+                  If your landlord or property owner has registered on Intact, enter their 8-character property join code below. Linking allows you to seamlessly share your final condition report with zero dispute over timestamps.
+                </p>
+
+                {linkError && (
+                  <div className="p-3 bg-damage-bg border border-damage-border text-damage font-mono">
+                    [!] {linkError}
+                  </div>
+                )}
+
+                <form onSubmit={handleLinkOwner} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-lg">
+                  <input
+                    type="text"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    placeholder="e.g. 8F2K9M4X"
+                    maxLength={10}
+                    disabled={linkingOwner}
+                    className="flex-1 px-3 py-2 border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent font-mono tracking-wider uppercase text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={linkingOwner || !joinCodeInput.trim()}
+                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white font-semibold uppercase tracking-wider font-mono text-xs transition-colors disabled:opacity-50 btn-motion lit-dark whitespace-nowrap"
+                  >
+                    {linkingOwner ? "Linking..." : "+ Link Property"}
+                  </button>
+                </form>
               </div>
             )}
           </div>
@@ -912,6 +1111,39 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 className="px-4 py-2 bg-damage hover:bg-damage text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50 btn-motion lit"
               >
                 {deleting ? "Deleting Record..." : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unlink Confirmation Modal */}
+      {showUnlinkModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-surface border border-ink-200 max-w-md w-full p-6 text-xs">
+            <h2 className="text-base font-bold text-ink-900 mb-2">
+              Unlink Property from Owner?
+            </h2>
+            <p className="text-ink-600 leading-relaxed mb-4">
+              Are you sure you want to disconnect this record from <strong>{tenancyLink?.name}</strong>? The owner will no longer see this tenancy link or have access to any shared reports.
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-4 border-t border-ink-100">
+              <button
+                type="button"
+                onClick={() => setShowUnlinkModal(false)}
+                disabled={unlinking}
+                className="px-4 py-2 border border-ink-200 hover:border-ink-400 bg-surface text-ink-700 font-semibold uppercase text-xs tracking-wider transition-colors btn-motion lit"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUnlink}
+                disabled={unlinking}
+                className="px-4 py-2 bg-damage hover:bg-damage text-white font-semibold uppercase text-xs tracking-wider transition-colors disabled:opacity-50 btn-motion lit"
+              >
+                {unlinking ? "Unlinking..." : "Unlink Property"}
               </button>
             </div>
           </div>

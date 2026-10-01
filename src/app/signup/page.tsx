@@ -5,10 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authSchema } from "@/lib/validation";
+import { api } from "@/lib/api";
+import { UserRole } from "@/types/database";
 
 export default function SignupPage() {
   const router = useRouter();
 
+  const [roleTab, setRoleTab] = useState<UserRole>("tenant");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,7 +66,19 @@ export default function SignupPage() {
       }
 
       if (data.session) {
-        router.push("/properties");
+        // Create the profile record
+        await api.createProfile({
+          role: roleTab,
+          display_name: name.trim() || undefined,
+        }).catch((err) => {
+          console.error("Profile creation error:", err);
+        });
+
+        if (roleTab === "owner") {
+          router.push("/owner");
+        } else {
+          router.push("/properties");
+        }
         router.refresh();
       } else {
         setSuccessNotice(
@@ -82,15 +97,51 @@ export default function SignupPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Signup Form */}
         <div className="lg:col-span-7 bg-surface border border-ink-200 p-6 sm:p-8">
+          {/* Role Tabs */}
+          <div className="flex border-b border-ink-200 mb-6 font-mono text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setRoleTab("tenant");
+                setErrors({});
+              }}
+              className={`pb-3 px-4 uppercase tracking-wider font-semibold border-b-2 -mb-px transition-colors ${
+                roleTab === "tenant"
+                  ? "border-accent text-accent font-bold"
+                  : "border-transparent text-ink-500 hover:text-ink-900"
+              }`}
+            >
+              For tenants
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRoleTab("owner");
+                setErrors({});
+              }}
+              className={`pb-3 px-4 uppercase tracking-wider font-semibold border-b-2 -mb-px transition-colors ${
+                roleTab === "owner"
+                  ? "border-accent text-accent font-bold"
+                  : "border-transparent text-ink-500 hover:text-ink-900"
+              }`}
+            >
+              For owners
+            </button>
+          </div>
+
           <div className="border-b border-ink-200 pb-4 mb-6">
             <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
-              NEW RECORD · 01
+              {roleTab === "tenant" ? "TENANT REGISTRATION · 01" : "OWNER REGISTRATION · 01"}
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-ink-900 mt-1">
-              Open your inspection record.
+              {roleTab === "tenant"
+                ? "Open your tenant inspection record."
+                : "Open your property owner register."}
             </h1>
             <p className="text-xs text-ink-600 mt-1">
-              One account holds every property you rent. Photographs stay yours and are never sent to a landlord unless you share a report.
+              {roleTab === "tenant"
+                ? "One account holds every property you rent. Photographs stay yours and are never sent to a landlord unless you share a report."
+                : "Register your rental properties, generate join codes for tenants, and review shared condition reports in one place."}
             </p>
           </div>
 
@@ -115,13 +166,15 @@ export default function SignupPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Rahul Sharma"
+                placeholder={roleTab === "tenant" ? "e.g. Rahul Sharma" : "e.g. Vikram Mehta"}
                 autoComplete="name"
                 disabled={loading}
                 className="w-full px-3 py-2 text-xs border border-ink-200 bg-page focus:bg-surface focus:outline-none focus:border-accent transition-colors"
               />
               <p className="text-[10px] font-mono text-ink-500 mt-1">
-                Appears on issued reports.
+                {roleTab === "tenant"
+                  ? "Appears on issued reports."
+                  : "Appears on property registers shared with tenants."}
               </p>
             </div>
 
@@ -133,7 +186,7 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tenant@example.com"
+                placeholder={roleTab === "tenant" ? "tenant@example.com" : "owner@example.com"}
                 autoComplete="email"
                 disabled={loading}
                 className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
@@ -146,7 +199,7 @@ export default function SignupPage() {
                 <p className="text-[11px] text-damage mt-1 font-mono">{errors.email}</p>
               ) : (
                 <p className="text-[10px] font-mono text-ink-500 mt-1">
-                  Used to recover access to your record.
+                  Used to sign in and recover your account.
                 </p>
               )}
             </div>
@@ -214,7 +267,11 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full mt-2 py-2.5 px-4 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50 btn-motion lit-dark"
             >
-              {loading ? "Opening record..." : "Open the record"}
+              {loading
+                ? "Creating account..."
+                : roleTab === "tenant"
+                ? "Open tenant record"
+                : "Open owner register"}
             </button>
           </form>
 
@@ -224,7 +281,7 @@ export default function SignupPage() {
               href="/login"
               className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase"
             >
-              I already have a record →
+              I already have an account →
             </Link>
           </div>
 
@@ -237,48 +294,82 @@ export default function SignupPage() {
         <div className="lg:col-span-5 bg-page border border-ink-200 p-6 sm:p-8 space-y-4">
           <div className="border-b border-ink-200 pb-3">
             <span className="text-[10px] font-mono uppercase text-ink-500 tracking-wider block">
-              REGISTER EXTRACT · SAMPLE
+              {roleTab === "tenant" ? "REGISTER EXTRACT · TENANT VIEW" : "REGISTER EXTRACT · OWNER VIEW"}
             </span>
             <h2 className="text-xs font-mono font-bold text-ink-900 mt-0.5 uppercase">
-              Dated Area Register
+              {roleTab === "tenant" ? "Dated Area Register" : "Property & Tenancy Links"}
             </h2>
           </div>
 
-          <div className="divide-y divide-ink-200 text-xs font-mono">
-            <div className="py-2.5 flex items-center justify-between">
-              <span className="text-ink-900">01 Entrance — door & frame</span>
-              <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
-                MOVE-IN RECORDED
-              </span>
+          {roleTab === "tenant" ? (
+            <div className="divide-y divide-ink-200 text-xs font-mono">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-ink-900">01 Entrance — door & frame</span>
+                <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
+                  MOVE-IN RECORDED
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-ink-900">02 Living room — east wall</span>
+                <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
+                  MOVE-IN RECORDED
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-ink-900">03 Bedroom — north wall</span>
+                <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
+                  COMPARED · 3 FINDINGS
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-ink-900">07 Kitchen — counter</span>
+                <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
+                  COMPARED · 2 FINDINGS
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-ink-900">09 Kitchen — floor</span>
+                <span className="text-[10px] text-ink-500 font-semibold uppercase bg-surface px-1.5 py-0.5 border border-ink-200">
+                  MOVE-OUT NEEDED
+                </span>
+              </div>
             </div>
-            <div className="py-2.5 flex items-center justify-between">
-              <span className="text-ink-900">02 Living room — east wall</span>
-              <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
-                MOVE-IN RECORDED
-              </span>
+          ) : (
+            <div className="divide-y divide-ink-200 text-xs font-mono">
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="text-ink-900 font-semibold">Flat 402, Oakwood Towers</div>
+                  <div className="text-[10px] text-ink-500">CODE: 8F2K9M4X · 1 TENANT</div>
+                </div>
+                <span className="text-[10px] text-accepted font-semibold uppercase bg-accepted-bg px-1.5 py-0.5 border border-accepted-border">
+                  REPORT SHARED
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="text-ink-900 font-semibold">Villa 12, Palm Meadows</div>
+                  <div className="text-[10px] text-ink-500">CODE: 3N7P6T2W · 1 TENANT</div>
+                </div>
+                <span className="text-[10px] text-ink-500 font-semibold uppercase bg-surface px-1.5 py-0.5 border border-ink-200">
+                  NOT SHARED
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="text-ink-900 font-semibold">Studio 3B, Cyber Heights</div>
+                  <div className="text-[10px] text-ink-500">CODE: 9L4X7Q1R · 0 TENANTS</div>
+                </div>
+                <span className="text-[10px] text-ink-400 font-semibold uppercase bg-surface px-1.5 py-0.5 border border-ink-200">
+                  AWAITING LINK
+                </span>
+              </div>
             </div>
-            <div className="py-2.5 flex items-center justify-between">
-              <span className="text-ink-900">03 Bedroom — north wall</span>
-              <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
-                COMPARED · 3 FINDINGS
-              </span>
-            </div>
-            <div className="py-2.5 flex items-center justify-between">
-              <span className="text-ink-900">07 Kitchen — counter</span>
-              <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
-                COMPARED · 2 FINDINGS
-              </span>
-            </div>
-            <div className="py-2.5 flex items-center justify-between">
-              <span className="text-ink-900">09 Kitchen — floor</span>
-              <span className="text-[10px] text-ink-500 font-semibold uppercase bg-surface px-1.5 py-0.5 border border-ink-200">
-                MOVE-OUT NEEDED
-              </span>
-            </div>
-          </div>
+          )}
 
           <p className="text-xs text-ink-600 leading-relaxed pt-3 border-t border-ink-200">
-            Every photograph in Intact belongs to an area, a stage and a timestamp. That is the whole idea: a record you can read two years later.
+            {roleTab === "tenant"
+              ? "Every photograph in Intact belongs to an area, a stage and a timestamp. That is the whole idea: a record you can read two years later."
+              : "Owners register their property once to generate an unambiguous join code. Tenants link to this code and control when to share read-only condition reports."}
           </p>
         </div>
       </div>

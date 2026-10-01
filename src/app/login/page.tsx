@@ -5,22 +5,27 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authSchema } from "@/lib/validation";
+import { api } from "@/lib/api";
+import type { UserRole } from "@/types/database";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawNext = searchParams.get("next");
-  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/properties";
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
 
+  const [activeTab, setActiveTab] = useState<UserRole>("tenant");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [roleNotice, setRoleNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setRoleNotice(null);
 
     const validation = authSchema.safeParse({ email, password });
     if (!validation.success) {
@@ -34,19 +39,44 @@ function LoginForm() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
-      if (error) {
-        setErrors({ general: error.message || "Invalid email or password." });
+      if (authError) {
+        setErrors({ general: authError.message || "Invalid email or password." });
         setLoading(false);
         return;
       }
 
-      router.push(nextPath);
-      router.refresh();
+      // Read profile role from server API
+      const profile = await api.getProfile().catch(() => ({ role: "tenant" as UserRole }));
+      const userRole = profile.role || "tenant";
+
+      if (userRole === "owner") {
+        if (activeTab === "tenant") {
+          setRoleNotice("This is an owner account. Opening your owner dashboard.");
+          setTimeout(() => {
+            router.push("/owner");
+            router.refresh();
+          }, 1000);
+        } else {
+          router.push("/owner");
+          router.refresh();
+        }
+      } else {
+        if (activeTab === "owner") {
+          setRoleNotice("This is a tenant account. Opening your tenant dashboard.");
+          setTimeout(() => {
+            router.push(nextPath || "/properties");
+            router.refresh();
+          }, 1000);
+        } else {
+          router.push(nextPath || "/properties");
+          router.refresh();
+        }
+      }
     } catch {
       setErrors({ general: "An unexpected network error occurred. Please try again." });
       setLoading(false);
@@ -57,17 +87,51 @@ function LoginForm() {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       {/* Left Column: Login Form */}
       <div className="lg:col-span-7 bg-surface border border-ink-200 p-6 sm:p-8">
+        {/* Role Tabs */}
+        <div className="flex border-b border-ink-200 mb-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab("tenant")}
+            className={`pb-2.5 px-4 font-mono text-xs uppercase tracking-wider font-semibold border-b-2 transition-colors ${
+              activeTab === "tenant"
+                ? "border-accent text-ink-900"
+                : "border-transparent text-ink-500 hover:text-ink-800"
+            }`}
+          >
+            For tenants
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("owner")}
+            className={`pb-2.5 px-4 font-mono text-xs uppercase tracking-wider font-semibold border-b-2 transition-colors ${
+              activeTab === "owner"
+                ? "border-accent text-ink-900"
+                : "border-transparent text-ink-500 hover:text-ink-800"
+            }`}
+          >
+            For owners
+          </button>
+        </div>
+
         <div className="border-b border-ink-200 pb-4 mb-6">
           <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
-            RETURNING TENANT
+            {activeTab === "tenant" ? "RETURNING TENANT" : "PROPERTY OWNER"}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-ink-900 mt-1">
-            Open your register.
+            {activeTab === "tenant" ? "Open your register." : "Open your owner register."}
           </h1>
           <p className="text-xs text-ink-600 mt-1">
-            Your properties, areas and dated photographs are where you left them.
+            {activeTab === "tenant"
+              ? "Your properties, areas and dated photographs are where you left them."
+              : "Manage your properties, generate join codes and view shared condition records."}
           </p>
         </div>
+
+        {roleNotice && (
+          <div className="mb-5 p-3 text-xs bg-page border border-ink-300 text-ink-800 font-mono">
+            {roleNotice}
+          </div>
+        )}
 
         {errors.general && (
           <div className="mb-5 p-3 text-xs bg-damage-bg border border-damage-border text-damage">
@@ -84,7 +148,7 @@ function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="tenant@example.com"
+              placeholder="name@example.com"
               autoComplete="email"
               disabled={loading}
               className={`w-full px-3 py-2 text-xs border bg-page focus:bg-surface focus:outline-none transition-colors ${
@@ -142,7 +206,7 @@ function LoginForm() {
         <div className="mt-6 pt-4 border-t border-ink-100 flex items-center justify-between text-xs">
           <span className="text-ink-600">Need a fresh record?</span>
           <Link
-            href="/signup"
+            href={`/signup${activeTab === "owner" ? "?role=owner" : ""}`}
             className="text-accent hover:underline font-semibold font-mono text-[11px] uppercase"
           >
             Open a new record →
@@ -154,52 +218,65 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Right Column: Register Extract (Matching Lovable Reference) */}
+      {/* Right Column: Register Extract */}
       <div className="lg:col-span-5 bg-page border border-ink-200 p-6 sm:p-8 space-y-4">
         <div className="border-b border-ink-200 pb-3">
           <span className="text-[10px] font-mono uppercase text-ink-500 tracking-wider block">
-            REGISTER EXTRACT · SAMPLE
+            {activeTab === "tenant" ? "TENANT REGISTER EXTRACT" : "OWNER PORTAL OVERVIEW"}
           </span>
           <h2 className="text-xs font-mono font-bold text-ink-900 mt-0.5 uppercase">
-            Dated Area Register
+            {activeTab === "tenant" ? "Dated Area Register" : "Property Join Codes"}
           </h2>
         </div>
 
-        <div className="divide-y divide-ink-200 text-xs font-mono">
-          <div className="py-2.5 flex items-center justify-between">
-            <span className="text-ink-900">01 Entrance — door & frame</span>
-            <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
-              MOVE-IN RECORDED
-            </span>
+        {activeTab === "tenant" ? (
+          <div className="divide-y divide-ink-200 text-xs font-mono">
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">01 Entrance — door & frame</span>
+              <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
+                MOVE-IN RECORDED
+              </span>
+            </div>
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">02 Living room — east wall</span>
+              <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
+                MOVE-IN RECORDED
+              </span>
+            </div>
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">03 Bedroom — north wall</span>
+              <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
+                COMPARED · 3 FINDINGS
+              </span>
+            </div>
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">07 Kitchen — counter</span>
+              <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
+                COMPARED · 2 FINDINGS
+              </span>
+            </div>
           </div>
-          <div className="py-2.5 flex items-center justify-between">
-            <span className="text-ink-900">02 Living room — east wall</span>
-            <span className="text-[10px] text-accent font-semibold uppercase bg-accent-tint px-1.5 py-0.5 border border-accent-border">
-              MOVE-IN RECORDED
-            </span>
+        ) : (
+          <div className="divide-y divide-ink-200 text-xs font-mono">
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">Flat 402 — Greenview</span>
+              <span className="text-[10px] text-accent font-bold uppercase bg-surface px-2 py-0.5 border border-ink-300">
+                CODE: K7M9X2PQ
+              </span>
+            </div>
+            <div className="py-2.5 flex items-center justify-between">
+              <span className="text-ink-900">Villa 12 — Palm Grove</span>
+              <span className="text-[10px] text-accent font-bold uppercase bg-surface px-2 py-0.5 border border-ink-300">
+                CODE: B3N8W4TR
+              </span>
+            </div>
           </div>
-          <div className="py-2.5 flex items-center justify-between">
-            <span className="text-ink-900">03 Bedroom — north wall</span>
-            <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
-              COMPARED · 3 FINDINGS
-            </span>
-          </div>
-          <div className="py-2.5 flex items-center justify-between">
-            <span className="text-ink-900">07 Kitchen — counter</span>
-            <span className="text-[10px] text-wear font-semibold uppercase bg-wear-bg px-1.5 py-0.5 border border-wear-border">
-              COMPARED · 2 FINDINGS
-            </span>
-          </div>
-          <div className="py-2.5 flex items-center justify-between">
-            <span className="text-ink-900">09 Kitchen — floor</span>
-            <span className="text-[10px] text-ink-500 font-semibold uppercase bg-surface px-1.5 py-0.5 border border-ink-200">
-              MOVE-OUT NEEDED
-            </span>
-          </div>
-        </div>
+        )}
 
-        <p className="text-xs text-ink-600 leading-relaxed pt-3 border-t border-ink-200">
-          Every photograph in Intact belongs to an area, a stage and a timestamp. That is the whole idea: a record you can read two years later.
+        <p className="text-xs text-ink-600 leading-relaxed pt-3 border-t border-ink-200 font-sans">
+          {activeTab === "tenant"
+            ? "Every photograph in Intact belongs to an area, a stage and a timestamp. That is the whole idea: a record you can read two years later."
+            : "Owners create properties and generate join codes. Tenants link their records and can choose to share condition reports upon move-in or move-out."}
         </p>
       </div>
     </div>
@@ -215,4 +292,3 @@ export default function LoginPage() {
     </main>
   );
 }
-

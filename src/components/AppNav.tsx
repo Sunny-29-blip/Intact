@@ -8,20 +8,45 @@ import type { User } from "@supabase/supabase-js";
 
 export function AppNav() {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    const checkUserAndRole = async () => {
+      const { data } = await supabase.auth.getUser();
       setUser(data.user);
+      if (data.user) {
+        try {
+          const res = await fetch("/api/profile");
+          if (res.ok) {
+            const body = await res.json();
+            setRole(body.data?.role || "tenant");
+          }
+        } catch {
+          setRole("tenant");
+        }
+      }
       setLoading(false);
-    });
+    };
+
+    checkUserAndRole();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      if (session?.user) {
+        fetch("/api/profile")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((body) => {
+            if (body?.data?.role) setRole(body.data.role);
+          })
+          .catch(() => {});
+      } else {
+        setRole(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -33,7 +58,8 @@ export function AppNav() {
     router.refresh();
   };
 
-
+  const registerHref = role === "owner" ? "/owner" : "/properties";
+  const isRegisterActive = role === "owner" ? pathname.startsWith("/owner") : pathname.startsWith("/properties");
 
   return (
     <header className="border-b border-ink-200 bg-surface sticky top-0 z-40">
@@ -47,27 +73,29 @@ export function AppNav() {
             <span className="font-sans tracking-wide">INTACT</span>
             <span className="text-ink-400 font-mono font-normal text-xs">—</span>
             <span className="text-[10px] font-mono font-normal text-ink-500 uppercase tracking-wider">
-              INSPECTION RECORD
+              {role === "owner" ? "OWNER REGISTER" : "INSPECTION RECORD"}
             </span>
           </Link>
 
           <nav className="hidden md:flex items-center space-x-1 text-xs font-mono uppercase tracking-wider">
             <Link
-              href="/properties"
+              href={registerHref}
               className={`px-3 py-1.5 transition-colors border lit ${
-                pathname.startsWith("/properties")
+                isRegisterActive
                   ? "bg-page border-ink-200 text-ink-900 font-semibold"
                   : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
               }`}
             >
-              Register
+              {role === "owner" ? "Owner Register" : "Register"}
             </Link>
-            <Link
-              href="/properties"
-              className="px-3 py-1.5 transition-colors border border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100 lit"
-            >
-              Comparison
-            </Link>
+            {role !== "owner" && (
+              <Link
+                href="/properties"
+                className="px-3 py-1.5 transition-colors border border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100 lit"
+              >
+                Comparison
+              </Link>
+            )}
             <Link
               href="/report/sample"
               className={`px-3 py-1.5 transition-colors border lit ${
@@ -76,8 +104,20 @@ export function AppNav() {
                   : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
               }`}
             >
-              Report
+              Sample Report
             </Link>
+            {user && (
+              <Link
+                href="/profile"
+                className={`px-3 py-1.5 transition-colors border lit ${
+                  pathname.startsWith("/profile")
+                    ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                    : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+                }`}
+              >
+                Profile
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -87,10 +127,15 @@ export function AppNav() {
           ) : user ? (
             <div className="flex items-center space-x-3">
               <Link
-                href="/properties"
-                className="hidden sm:inline-block px-2.5 py-1 text-[11px] text-ink-700 bg-page border border-ink-200 hover:border-ink-400 truncate max-w-xs"
+                href="/profile"
+                className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 text-[11px] text-ink-700 bg-page border border-ink-200 hover:border-ink-400 truncate max-w-xs"
               >
-                {user.email}
+                <span className="truncate">{user.email}</span>
+                {role && (
+                  <span className="text-[9px] uppercase font-bold text-accent bg-accent-tint px-1 py-0.2 border border-accent-border">
+                    {role}
+                  </span>
+                )}
               </Link>
               <button
                 onClick={handleLogout}

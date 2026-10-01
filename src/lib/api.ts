@@ -7,12 +7,21 @@ import type {
   ComparisonWithFindings,
   Finding,
   ApiResponse,
+  Profile,
+  OwnerProperty,
+  OwnerPropertyDetail,
+  TenantLinkedOwnerProperty,
 } from "@/types/database";
 import type {
   CreatePropertyInput,
   UpdatePropertyInput,
   RegisterPhotoInput,
   UpdateFindingDecisionInput,
+  CreateProfileInput,
+  UpdateProfileInput,
+  CreateOwnerPropertyInput,
+  UpdateOwnerPropertyInput,
+  LinkTenancyInput,
 } from "@/lib/validation";
 
 class ApiError extends Error {
@@ -50,7 +59,81 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  // Properties
+  // Profiles
+  async getProfile(): Promise<Profile> {
+    return request<Profile>("/api/profile");
+  },
+
+  async createProfile(data: CreateProfileInput): Promise<Profile> {
+    return request<Profile>("/api/profile", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateProfile(data: UpdateProfileInput): Promise<Profile> {
+    return request<Profile>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Owner Properties
+  async getOwnerProperties(): Promise<OwnerProperty[]> {
+    return request<OwnerProperty[]>("/api/owner/properties");
+  },
+
+  async createOwnerProperty(data: CreateOwnerPropertyInput): Promise<OwnerProperty> {
+    return request<OwnerProperty>("/api/owner/properties", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getOwnerProperty(id: string): Promise<OwnerPropertyDetail> {
+    return request<OwnerPropertyDetail>(`/api/owner/properties/${id}`);
+  },
+
+  async updateOwnerProperty(id: string, data: UpdateOwnerPropertyInput): Promise<OwnerProperty> {
+    return request<OwnerProperty>(`/api/owner/properties/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteOwnerProperty(id: string): Promise<{ deleted: boolean }> {
+    return request<{ deleted: boolean }>(`/api/owner/properties/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Tenancy Links (Tenant side)
+  async getTenantLinks(propertyId?: string): Promise<TenantLinkedOwnerProperty[]> {
+    const url = propertyId ? `/api/links?propertyId=${encodeURIComponent(propertyId)}` : "/api/links";
+    return request<TenantLinkedOwnerProperty[]>(url);
+  },
+
+  async linkTenancy(data: LinkTenancyInput): Promise<TenantLinkedOwnerProperty> {
+    return request<TenantLinkedOwnerProperty>("/api/links", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateLinkShare(id: string, shared: boolean): Promise<TenantLinkedOwnerProperty> {
+    return request<TenantLinkedOwnerProperty>(`/api/links/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ shared }),
+    });
+  },
+
+  async unlinkTenancy(id: string): Promise<{ deleted: boolean }> {
+    return request<{ deleted: boolean }>(`/api/links/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Tenant Properties
   async getProperties(): Promise<PropertyListItem[]> {
     return request<PropertyListItem[]>("/api/properties");
   },

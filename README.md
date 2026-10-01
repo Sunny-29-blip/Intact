@@ -18,6 +18,15 @@ Tenants frequently face unfair security deposit deductions at move-out due to su
 
 Intact uses a secure server-centric architecture. Tenant interactions (managing properties, uploading move-in/move-out photos, initiating comparisons) are executed via authenticated Next.js Server Actions and Route Handlers governed by PostgreSQL Row Level Security (RLS) policies. Photos are stored securely in a private Supabase Storage bucket with strict user-scoped access rules. When comparisons are triggered, a server-only worker fetches the matching move-in and move-out photos, calculates visual diffs using Google Gemini with structured JSON output, and persists normalized bounding-box findings. Read-only landlord reports are served via unique, unguessable share tokens accessed through privileged server clients without exposing private user accounts.
 
+## Roles
+
+Intact supports two distinct roles with separate dashboards and strict server-enforced boundaries:
+
+- **Tenant (`role: 'tenant'`)**: Records move-in and move-out condition photos, reviews AI comparison findings, manages deposit dispute justifications, and controls when to share read-only inspection reports. Tenants link to owner properties using an 8-character join code without revealing private account details.
+- **Owner (`role: 'owner'`)**: Registers rental properties to generate unique, unambiguous 8-character join codes (`/owner`). Owners can view linked tenant entries and access read-only inspection reports once explicitly shared by the tenant (`/report/[token]`). Owners have no direct database access to tenant photos or private tenancy records.
+
+Database migrations for roles and tenancy links are defined in [`supabase/roles.sql`](supabase/roles.sql).
+
 ## Setup
 
 1. **Clone the repository**:

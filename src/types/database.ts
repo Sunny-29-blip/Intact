@@ -1,8 +1,62 @@
+export type UserRole = "tenant" | "owner";
 export type InspectionKind = "move_in" | "move_out";
 export type ComparisonStatus = "pending" | "complete" | "failed";
 export type FindingClassification = "damage" | "wear" | "unclear";
 export type FindingSeverity = "minor" | "moderate" | "major";
 export type FindingDecision = "pending" | "accepted" | "disputed";
+
+export interface Profile {
+  user_id: string;
+  role: UserRole;
+  display_name: string | null;
+  created_at: string;
+  email?: string;
+}
+
+export interface OwnerProperty {
+  id: string;
+  owner_id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  join_code: string;
+  created_at: string;
+  linked_tenants_count?: number;
+}
+
+export interface TenancyLink {
+  id: string;
+  owner_property_id: string;
+  tenant_id: string;
+  tenant_property_id: string;
+  shared: boolean;
+  created_at: string;
+}
+
+export interface OwnerLinkedTenant {
+  link_id: string;
+  tenant_id: string;
+  display_name: string;
+  linked_at: string;
+  shared: boolean;
+  report_token?: string | null;
+  tenant_property_name?: string;
+}
+
+export interface OwnerPropertyDetail extends OwnerProperty {
+  linked_tenants: OwnerLinkedTenant[];
+}
+
+export interface TenantLinkedOwnerProperty {
+  link_id: string;
+  owner_property_id: string;
+  tenant_property_id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  shared: boolean;
+  linked_at: string;
+}
 
 export interface Property {
   id: string;
@@ -106,6 +160,29 @@ export interface ApiResponse<T> {
 export interface Database {
   public: {
     Tables: {
+      profiles: {
+        Row: Profile;
+        Insert: Omit<Profile, "created_at"> & {
+          created_at?: string;
+        };
+        Update: Partial<Omit<Profile, "user_id">>;
+      };
+      owner_properties: {
+        Row: OwnerProperty;
+        Insert: Omit<OwnerProperty, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<OwnerProperty, "id" | "owner_id">>;
+      };
+      tenancy_links: {
+        Row: TenancyLink;
+        Insert: Omit<TenancyLink, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<TenancyLink, "id" | "tenant_id">>;
+      };
       properties: {
         Row: Property;
         Insert: Omit<Property, "id" | "created_at" | "share_token"> & {
