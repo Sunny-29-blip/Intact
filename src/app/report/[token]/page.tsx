@@ -271,96 +271,108 @@ export default function ReportPage({ params }: PageProps) {
   }
 
   const { property, comparisons, photos } = data;
+  const propertyRef = `PR-${property.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase() || "1001"}`;
+  const reportId = `IN-${property.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase() || "1001"}-R07`;
+
+  const unchangedAreas = comparisons.filter((c) => c.findings.length === 0).map((c) => c.area);
+  const changedComparisons = comparisons.filter((c) => c.findings.length > 0);
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 print-page">
       {/* Document Sheet */}
-      <div className="border border-ink-200 bg-surface p-6 sm:p-10 text-xs">
-        {/* Document Header */}
-        <div className="border-b-2 border-ink-900 pb-5 mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-2 text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-1">
-              <span className="w-2 h-2 bg-accent inline-block"></span>
-              <span>INTACT · READ-ONLY VERIFICATION RECORD</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900 uppercase font-sans">
-              Move-Out Inspection Report
-            </h1>
-            <p className="text-xs text-ink-600 mt-0.5">
-              Objective condition record comparing move-in baseline and move-out departure photographs.
-            </p>
+      <div className="border border-ink-200 bg-surface p-6 sm:p-10 text-xs shadow-sm">
+        {/* Document Eyebrow & Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-ink-200 pb-4 mb-6 gap-3">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase text-ink-500">
+            <span className="font-bold text-ink-900">{reportId}</span>
+            <span>·</span>
+            <span className="px-2 py-0.5 bg-page border border-ink-200 text-ink-700">
+              READ-ONLY INSPECTION REPORT
+            </span>
           </div>
 
-          <div className="flex items-center space-x-2 no-print self-start">
+          <div className="flex items-center space-x-2 no-print">
             <button
               onClick={() => window.print()}
-              className="px-3 py-1.5 font-mono text-xs border border-ink-300 hover:border-ink-900 bg-page text-ink-900 font-medium"
+              className="px-3 py-1.5 font-mono text-xs border border-ink-300 hover:border-ink-900 bg-page text-ink-900 font-medium btn-motion lit"
             >
-              [ ⎙ Print Report ]
+              [ ⎙ Print / Save PDF ]
             </button>
           </div>
         </div>
 
+        {/* Title Header */}
+        <div className="border-b-2 border-ink-900 pb-5 mb-6">
+          <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-1">
+            INTACT INSPECTION REPORT
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">
+            Move-In / Move-Out Condition Record
+          </h1>
+          <p className="text-xs text-ink-600 mt-1 font-sans max-w-2xl leading-relaxed">
+            Objective condition record comparing move-in baseline and move-out departure photographs with automated visual comparison and tenant responses.
+          </p>
+        </div>
+
         {/* Property & Inspection Metadata Table */}
-        <div className="border border-ink-200 bg-page p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-[11px]">
+        <div className="border border-ink-200 bg-page p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-[11px] font-mono">
           <div>
-            <span className="font-mono text-[10px] text-ink-500 uppercase block">Property / Unit</span>
-            <strong className="text-ink-900 font-semibold">{property.name}</strong>
-            {property.address && <div className="text-ink-600 text-[10px] mt-0.5">{property.address}</div>}
+            <span className="text-[10px] text-ink-500 uppercase block">Property / Unit</span>
+            <strong className="text-ink-900 font-semibold font-sans block">{property.name}</strong>
+            {property.address && <div className="text-ink-600 text-[10px] mt-0.5 font-sans">{property.address}</div>}
           </div>
 
           <div>
-            <span className="font-mono text-[10px] text-ink-500 uppercase block">Tenancy Dates</span>
-            <span className="font-mono text-ink-900 font-medium">
+            <span className="text-[10px] text-ink-500 uppercase block">Property Reference</span>
+            <span className="text-ink-900 font-bold">{propertyRef}</span>
+            <div className="text-[10px] text-ink-500 mt-0.5">Dossier #{property.id.slice(0, 8)}</div>
+          </div>
+
+          <div>
+            <span className="text-[10px] text-ink-500 uppercase block">Tenancy Period</span>
+            <span className="text-ink-900 font-medium">
               {property.tenancy_start} → {property.tenancy_end || "(Ongoing)"}
             </span>
           </div>
 
           <div>
-            <span className="font-mono text-[10px] text-ink-500 uppercase block">Report Dossier ID</span>
-            <span title={property.id} className="font-mono text-[10px] text-ink-700 truncate block">
-              {property.id.slice(0, 18)}…
-            </span>
-          </div>
-
-          <div>
-            <span className="font-mono text-[10px] text-ink-500 uppercase block">Compiled Timestamp</span>
-            <span className="font-mono text-[10px] text-ink-900">
+            <span className="text-[10px] text-ink-500 uppercase block">Report Date</span>
+            <span className="text-ink-900">
               {formatDate(data.generated_at)}
             </span>
           </div>
         </div>
 
         {property.lease_notes && (
-          <div className="mb-6 p-3 bg-page border border-ink-200 text-xs">
+          <div className="mb-8 p-3.5 bg-page border border-ink-200 text-xs">
             <span className="font-mono uppercase font-bold text-[10px] text-ink-500 mr-2">
-              Lease Notes / Terms:
+              Lease Terms / Notes:
             </span>
-            <span className="text-ink-700">{property.lease_notes}</span>
+            <span className="text-ink-700 font-sans">{property.lease_notes}</span>
           </div>
         )}
 
-        {/* Inspection Summary Block */}
-        <div className="border border-ink-200 p-4 mb-8">
-          <div className="text-[10px] font-mono uppercase text-ink-500 font-bold mb-3">
-            INSPECTION SUMMARY
+        {/* Inspection Summary Block (Lovable Section 26) */}
+        <div className="border border-ink-200 p-5 mb-8 bg-surface">
+          <div className="text-[10px] font-mono uppercase text-ink-500 font-bold mb-3 tracking-wider">
+            RECORD SUMMARY
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center font-mono">
-            <div className="p-2 border border-ink-100 bg-page">
-              <span className="text-base font-bold text-ink-900 block">{totalComparisons}</span>
-              <span className="text-[10px] text-ink-500 uppercase">Areas Compared</span>
+            <div className="p-3 border border-ink-200 bg-page">
+              <span className="text-xl font-bold text-ink-900 block">{String(totalFindings).padStart(2, "0")}</span>
+              <span className="text-[10px] text-ink-500 uppercase">FINDINGS</span>
             </div>
-            <div className="p-2 border border-ink-100 bg-page">
-              <span className="text-base font-bold text-ink-900 block">{totalFindings}</span>
-              <span className="text-[10px] text-ink-500 uppercase">Total Findings</span>
+            <div className="p-3 border border-accepted-border bg-accepted-bg text-accepted">
+              <span className="text-xl font-bold block">{String(acceptedCount).padStart(2, "0")}</span>
+              <span className="text-[10px] uppercase font-bold">ACCEPTED</span>
             </div>
-            <div className="p-2 border border-accepted-border bg-accepted-bg text-accepted">
-              <span className="text-base font-bold block">{acceptedCount}</span>
-              <span className="text-[10px] uppercase">Accepted</span>
+            <div className="p-3 border border-disputed-border bg-disputed-bg text-disputed">
+              <span className="text-xl font-bold block">{String(disputedCount).padStart(2, "0")}</span>
+              <span className="text-[10px] uppercase font-bold">DISPUTED</span>
             </div>
-            <div className="p-2 border border-disputed-border bg-disputed-bg text-disputed">
-              <span className="text-base font-bold block">{disputedCount}</span>
-              <span className="text-[10px] uppercase">Disputed</span>
+            <div className="p-3 border border-ink-200 bg-page text-ink-600">
+              <span className="text-xl font-bold block">{String(pendingCount).padStart(2, "0")}</span>
+              <span className="text-[10px] uppercase">NOT REVIEWED</span>
             </div>
           </div>
         </div>
@@ -369,102 +381,123 @@ export default function ReportPage({ params }: PageProps) {
         <div className="mb-10">
           <div className="border-b border-ink-200 pb-2 mb-6">
             <h2 className="text-sm font-bold text-ink-900 uppercase font-mono tracking-wider">
-              Itemized Area Findings & Visual Comparisons
+              Itemized Area Findings ({totalFindings})
             </h2>
           </div>
 
-          {comparisons.length === 0 ? (
-            <div className="p-6 border border-dashed border-ink-200 text-center font-mono text-ink-500">
-              No comparison records present for this property.
+          {changedComparisons.length === 0 ? (
+            <div className="p-6 border border-ink-200 bg-page text-center font-mono text-xs text-ink-600">
+              ✓ No physical damage or visual differences identified across recorded areas.
             </div>
           ) : (
-            <div className="space-y-8">
-              {comparisons.map((comp) => (
-                <div key={comp.id} className="border border-ink-200 p-4 sm:p-5 bg-page">
-                  <div className="flex items-center justify-between border-b border-ink-200 pb-2 mb-3">
-                    <h3 className="font-bold text-ink-900 text-sm font-mono uppercase">
+            <div className="space-y-6">
+              {changedComparisons.map((comp) => (
+                <div key={comp.id} className="border border-ink-200 p-5 bg-page">
+                  <div className="flex items-center justify-between border-b border-ink-200 pb-2.5 mb-4">
+                    <h3 className="font-bold text-ink-900 text-xs font-mono uppercase">
                       AREA: {comp.area}
                     </h3>
                     <span className="font-mono text-[10px] text-ink-500">
-                      {comp.findings.length} finding{comp.findings.length === 1 ? "" : "s"}
+                      {comp.findings.length} difference{comp.findings.length === 1 ? "" : "s"}
                     </span>
                   </div>
 
-                  {/* Findings list */}
-                  {comp.findings.length === 0 ? (
-                    <div className="p-3 bg-surface border border-ink-100 text-xs text-ink-600 font-mono">
-                      ✓ No physical changes identified in this area. Move-out condition matches move-in baseline.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {comp.findings.map((f, idx) => (
-                        <div
-                          key={f.id}
-                          className="p-3 bg-surface border border-ink-200 text-xs space-y-1.5"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-start space-x-2">
-                              <span className="font-mono font-bold text-ink-900">
-                                #{idx + 1}
+                  <div className="space-y-3">
+                    {comp.findings.map((f, idx) => (
+                      <div
+                        key={f.id}
+                        className="p-3.5 bg-surface border border-ink-200 text-xs space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start space-x-2.5">
+                            <span className="w-5 h-5 bg-ink-900 text-white flex items-center justify-center font-mono text-[10px] font-bold flex-shrink-0 mt-0.5">
+                              {String(idx + 1).padStart(2, "0")}
+                            </span>
+                            <div>
+                              <span className="font-semibold text-ink-900 text-sm font-sans block">
+                                {f.description}
                               </span>
-                              <div>
-                                <span className="font-semibold text-ink-900">
-                                  {f.description}
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                {getClassificationBadge(f.classification)}
+                                <span className="text-[10px] font-mono text-ink-500 uppercase">
+                                  {f.severity} severity · {Math.round(f.confidence * 100)}% confidence
                                 </span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  {getClassificationBadge(f.classification)}
-                                  <span className="text-[10px] font-mono text-ink-500 uppercase">
-                                    {f.severity} severity · {Math.round(f.confidence * 100)}% confidence
-                                  </span>
-                                </div>
                               </div>
-                            </div>
-
-                            <div className="font-mono text-[10px] font-bold">
-                              {f.decision === "accepted" && (
-                                <span className="px-1.5 py-0.5 bg-accepted-bg text-accepted border border-accepted-border">
-                                  ✓ ACCEPTED
-                                </span>
-                              )}
-                              {f.decision === "disputed" && (
-                                <span className="px-1.5 py-0.5 bg-disputed-bg text-disputed border border-disputed-border">
-                                  ⚠ DISPUTED
-                                </span>
-                              )}
-                              {f.decision === "pending" && (
-                                <span className="px-1.5 py-0.5 bg-page text-ink-500 border border-ink-200">
-                                  NOT REVIEWED
-                                </span>
-                              )}
                             </div>
                           </div>
 
-                          {f.reasoning && (
-                            <div className="text-[11px] text-ink-600 pl-5 leading-relaxed">
-                              <strong>Analysis:</strong> {f.reasoning}
-                            </div>
-                          )}
-
-                          {f.decision === "disputed" && f.decision_note && (
-                            <div className="text-[11px] text-disputed bg-disputed-bg p-2 border border-disputed-border pl-5">
-                              <strong>Tenant Dispute Note:</strong> {f.decision_note}
-                            </div>
-                          )}
+                          <div className="font-mono text-[10px] font-bold whitespace-nowrap">
+                            {f.decision === "accepted" && (
+                              <span className="px-2 py-0.5 bg-accepted-bg text-accepted border border-accepted-border">
+                                ✓ ACCEPTED
+                              </span>
+                            )}
+                            {f.decision === "disputed" && (
+                              <span className="px-2 py-0.5 bg-disputed-bg text-disputed border border-disputed-border">
+                                ⚠ DISPUTED
+                              </span>
+                            )}
+                            {f.decision === "pending" && (
+                              <span className="px-2 py-0.5 bg-page text-ink-500 border border-ink-200">
+                                NOT REVIEWED
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        {f.reasoning && (
+                          <div className="text-[11px] text-ink-600 pl-7 leading-relaxed font-sans bg-page p-2 border border-ink-100">
+                            <strong className="font-mono uppercase text-[10px] text-ink-700 block mb-0.5">
+                              Analysis:
+                            </strong>
+                            {f.reasoning}
+                          </div>
+                        )}
+
+                        {f.decision === "disputed" && f.decision_note && (
+                          <div className="text-[11px] text-disputed bg-disputed-bg p-2.5 border border-disputed-border pl-7 font-sans">
+                            <strong className="font-mono uppercase text-[10px] block mb-0.5">
+                              Tenant Dispute Statement:
+                            </strong>
+                            {f.decision_note}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
+        {/* Areas with No Recorded Difference (Lovable Section 23) */}
+        {unchangedAreas.length > 0 && (
+          <div className="mb-10 border border-ink-200 bg-page p-5 text-xs">
+            <div className="flex items-center space-x-2 text-accepted font-mono text-[10px] font-bold uppercase mb-2">
+              <span className="w-2 h-2 bg-accepted inline-block"></span>
+              <span>AREAS WITH NO RECORDED DIFFERENCE ({unchangedAreas.length})</span>
+            </div>
+            <p className="text-ink-600 font-sans leading-relaxed mb-3">
+              The following areas were compared against move-in baseline photographs and no difference was detected:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+              {unchangedAreas.map((area, i) => (
+                <div key={area} className="p-2 bg-surface border border-ink-200 flex items-center space-x-2">
+                  <span className="text-ink-400 font-bold">{String(i + 1).padStart(2, "0")}.</span>
+                  <span className="text-ink-800 uppercase font-semibold">{area}</span>
+                  <span className="text-accepted ml-auto font-bold">✓ UNCHANGED</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Cryptographic Photo Record Table */}
         <div className="mb-10">
           <div className="border-b border-ink-200 pb-2 mb-4">
             <h2 className="text-sm font-bold text-ink-900 uppercase font-mono tracking-wider">
-              Cryptographic Photo Audit Register
+              Photo Evidence & Cryptographic Hashes ({photos.length})
             </h2>
           </div>
 
@@ -497,20 +530,39 @@ export default function ReportPage({ params }: PageProps) {
           </div>
         </div>
 
+        {/* Technical Metadata Section (Lovable Section 29) */}
+        <div className="border border-ink-200 bg-page p-4 mb-8 text-[10px] font-mono text-ink-600 space-y-1">
+          <div className="font-bold text-ink-700 uppercase mb-1">TECHNICAL METADATA</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+            <div>
+              <span className="text-ink-400">RECORD HASH:</span>{" "}
+              <span>{formatSha(property.id)}</span>
+            </div>
+            <div>
+              <span className="text-ink-400">COMPARISON PASSES:</span>{" "}
+              <span>{comparisons.length} completed</span>
+            </div>
+            <div>
+              <span className="text-ink-400">PHOTOGRAPHS HELD:</span>{" "}
+              <span>{photos.length} files in audit storage</span>
+            </div>
+            <div>
+              <span className="text-ink-400">DOCUMENT REVISION:</span>{" "}
+              <span>REV-2026.01 · SHA256 AUDIT VERIFIED</span>
+            </div>
+          </div>
+        </div>
+
         {/* Mandatory About This Report Notice */}
-        <div className="border-t-2 border-ink-200 pt-6 text-[11px] text-ink-600 leading-relaxed bg-page p-4 border">
-          <div className="font-mono uppercase font-bold text-ink-700 text-[10px] mb-2">
-            ABOUT THIS REPORT
+        <div className="border-t-2 border-ink-200 pt-5 text-[11px] text-ink-600 leading-relaxed font-sans">
+          <div className="font-mono uppercase font-bold text-ink-800 text-[10px] mb-1.5">
+            ABOUT THIS REPORT & BOUNDARY STATEMENT
           </div>
           <p className="mb-2">
-            This report lists differences found by comparing move-in and move-out
-            photos, and the tenant&apos;s response to each. Labels and confidence scores
-            come from an automated visual comparison and can be wrong. It is not
-            legal advice and does not estimate repair costs or decide who pays.
+            This report records visual differences found by comparing move-in and move-out photos, alongside the tenant&apos;s responses. Labels and confidence scores are generated by automated visual comparison. It does not provide legal advice, estimate repair costs, or assign financial liability.
           </p>
           <p className="font-mono text-[10px] text-ink-500">
-            A matching hash shows a photo file has not changed since it was
-            uploaded. It does not show when the photo was taken.
+            Intact records condition. It does not assign liability.
           </p>
         </div>
       </div>

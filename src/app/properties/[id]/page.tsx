@@ -316,16 +316,25 @@ export default function PropertyDetailPage({ params }: PageProps) {
     }
   };
 
+  const getPropertyRef = (id: string) => {
+    const clean = id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase();
+    return `PR-${clean || "1001"}`;
+  };
+
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {/* Breadcrumb */}
+      {/* Breadcrumb & Property Reference */}
       <div className="flex items-center space-x-2 text-xs font-mono text-ink-500 mb-4">
         <Link href="/properties" className="hover:text-ink-900 underline">
-          PROPERTIES
+          REGISTER
         </Link>
         <span>/</span>
-        <span className="text-ink-900 font-semibold truncate max-w-xs">
-          {property?.name || "DOSSIER"}
+        <span className="text-ink-900 font-semibold font-mono">
+          {property ? getPropertyRef(property.id) : "DOSSIER"}
+        </span>
+        <span>/</span>
+        <span className="text-ink-600 truncate max-w-xs">
+          {property?.name || "Loading..."}
         </span>
       </div>
 
@@ -340,8 +349,8 @@ export default function PropertyDetailPage({ params }: PageProps) {
 
       {/* Error state */}
       {error && (
-        <div className="p-4 bg-damage-bg border border-damage-border text-xs text-damage mb-6 flex items-center justify-between">
-          <span>{error}</span>
+        <div className="p-4 bg-damage-bg border border-damage-border text-xs text-damage mb-6 flex items-center justify-between font-mono">
+          <span>[!] {error}</span>
           <button
             onClick={fetchPropertyAndComparisons}
             className="underline font-semibold hover:text-damage"
@@ -357,14 +366,16 @@ export default function PropertyDetailPage({ params }: PageProps) {
           <div className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-ink-200 pb-5">
               <div>
-                <div className="text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-1">
-                  TENANCY CONDITION DOSSIER
+                <div className="flex items-center gap-2 text-[10px] font-mono uppercase text-ink-500 tracking-wider mb-1">
+                  <span className="font-bold text-accent">{getPropertyRef(property.id)}</span>
+                  <span>·</span>
+                  <span>PROPERTY RECORD</span>
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight text-ink-900">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">
                   {property.name}
                 </h1>
                 {property.address && (
-                  <p className="text-xs text-ink-600 mt-1">{property.address}</p>
+                  <p className="text-xs text-ink-600 mt-1 font-sans">{property.address}</p>
                 )}
               </div>
 
@@ -372,25 +383,25 @@ export default function PropertyDetailPage({ params }: PageProps) {
                 <Link
                   href={`/report/${property.share_token}`}
                   target="_blank"
-                  className="px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent-tint border border-accent-border transition-colors uppercase tracking-wider btn-motion lit"
+                  className="px-3.5 py-2 text-xs font-semibold text-accent hover:bg-accent-tint border border-accent-border transition-colors uppercase tracking-wider btn-motion lit"
                 >
                   View Inspection Report ↗
                 </Link>
                 <button
                   onClick={copyShareLink}
-                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
+                  className="px-3 py-2 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors uppercase font-mono tracking-wider btn-motion lit"
                 >
-                  {copiedShare ? "✓ Link Copied" : "Copy Landlord Link"}
+                  {copiedShare ? "✓ Copied" : "Copy Landlord Link"}
                 </button>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="px-3 py-1.5 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors btn-motion lit"
+                  className="px-3 py-2 text-xs font-semibold text-ink-700 hover:text-ink-900 border border-ink-200 hover:border-ink-400 bg-surface transition-colors font-mono uppercase btn-motion lit"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="px-3 py-1.5 text-xs font-semibold text-damage hover:bg-damage-bg border border-damage-border transition-colors btn-motion lit"
+                  className="px-3 py-2 text-xs font-semibold text-damage hover:bg-damage-bg border border-damage-border transition-colors font-mono uppercase btn-motion lit"
                 >
                   Delete
                 </button>
@@ -398,54 +409,129 @@ export default function PropertyDetailPage({ params }: PageProps) {
             </div>
 
             {/* Tenancy & Inspection Metadata */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-5 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-5 text-xs font-mono">
               <div>
-                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                <span className="block text-[10px] uppercase text-ink-500">
                   Tenancy Period
                 </span>
-                <span className="font-semibold text-ink-900 mt-0.5 block font-mono text-[11px]">
+                <span className="font-semibold text-ink-900 mt-0.5 block text-[11px]">
                   {property.tenancy_start}
                   {property.tenancy_end ? ` → ${property.tenancy_end}` : " (Current)"}
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-[10px] uppercase text-ink-500">
-                  Record ID
+                <span className="block text-[10px] uppercase text-ink-500">
+                  Property ID
                 </span>
                 <span
                   title={property.id}
-                  className="font-mono text-[11px] text-ink-700 mt-0.5 block truncate"
+                  className="text-[11px] text-ink-700 mt-0.5 block truncate"
                 >
-                  {property.id}
+                  {property.id.slice(0, 18)}…
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                <span className="block text-[10px] uppercase text-ink-500">
                   Move-In Baseline
                 </span>
                 <span className="font-semibold text-ink-900 mt-0.5 block">
-                  {moveInPhotos.length} {moveInPhotos.length === 1 ? "area photo" : "area photos"}
+                  {moveInPhotos.length} {moveInPhotos.length === 1 ? "area" : "areas"}
                 </span>
               </div>
               <div>
-                <span className="block font-mono text-[10px] uppercase text-ink-500">
+                <span className="block text-[10px] uppercase text-ink-500">
                   Move-Out Paired
                 </span>
                 <span className="font-semibold text-ink-900 mt-0.5 block">
-                  {moveOutPhotos.length} of {availableMoveInAreas.length} areas
+                  {moveOutPhotos.length} of {availableMoveInAreas.length || 0} areas
                 </span>
               </div>
             </div>
 
             {property.lease_notes && (
-              <div className="mt-4 pt-4 border-t border-ink-100 text-xs text-ink-700 bg-page p-3 border border-ink-200">
+              <div className="mt-5 pt-4 border-t border-ink-100 text-xs text-ink-700 bg-page p-3.5 border border-ink-200">
                 <span className="font-semibold font-mono uppercase text-ink-600 mr-2 text-[10px]">
                   Lease Terms / Notes:
                 </span>
-                {property.lease_notes}
+                <span className="font-sans">{property.lease_notes}</span>
               </div>
             )}
           </div>
+
+          {/* Area Register Summary (Lovable Section 15 Hierarchy) */}
+          {pairedAreas.length > 0 && (
+            <div className="border border-ink-200 bg-surface mb-8 overflow-hidden">
+              <div className="bg-page border-b border-ink-200 px-5 py-3 flex items-center justify-between">
+                <div className="text-[10px] font-mono uppercase text-ink-500 font-bold tracking-wider">
+                  AREA REGISTER · {pairedAreas.length} AREAS
+                </div>
+                <div className="text-[10px] font-mono text-ink-500">
+                  {comparisons.filter((c) => c.status === "complete").length} COMPARED
+                </div>
+              </div>
+              <div className="divide-y divide-ink-100 text-xs">
+                {pairedAreas.map((item, idx) => {
+                  const comp = comparisons.find((c) => c.area === item.area);
+                  const isCompComplete = comp?.status === "complete";
+                  const findingCount = comp?.findings.length || 0;
+
+                  return (
+                    <div
+                      key={item.area}
+                      className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-page/40 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="font-mono text-[11px] text-ink-400 font-bold w-6">
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <span className="font-semibold text-ink-900 font-mono uppercase">
+                          {item.area}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 font-mono text-[10px] pl-9 sm:pl-0">
+                        <span
+                          className={`px-2 py-0.5 border ${
+                            item.moveIn
+                              ? "bg-page text-ink-700 border-ink-200"
+                              : "bg-wear-bg text-wear border-wear-border"
+                          }`}
+                        >
+                          MOVE-IN: {item.moveIn ? "RECORDED" : "MISSING"}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 border ${
+                            item.moveOut
+                              ? "bg-page text-ink-700 border-ink-200"
+                              : "bg-wear-bg text-wear border-wear-border"
+                          }`}
+                        >
+                          MOVE-OUT: {item.moveOut ? "RECORDED" : "PENDING"}
+                        </span>
+                        {isCompComplete ? (
+                          <span
+                            className={`px-2 py-0.5 font-bold border ${
+                              findingCount === 0
+                                ? "bg-accepted-bg text-accepted border-accepted-border"
+                                : "bg-accent-tint text-accent border-accent-border"
+                            }`}
+                          >
+                            {findingCount === 0
+                              ? "NO DIFFERENCES"
+                              : `${findingCount} FINDING${findingCount === 1 ? "" : "S"}`}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-ink-400 border border-ink-200">
+                            UNCOMPARED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Section 1: Move-In Baseline Recording */}
           <section className="border border-ink-200 bg-surface p-6 sm:p-8 mb-8">

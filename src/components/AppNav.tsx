@@ -53,20 +53,34 @@ export function AppNav() {
             </span>
           </Link>
 
-          {user && (
-            <nav className="hidden sm:flex items-center space-x-1 text-xs font-medium">
-              <Link
-                href="/properties"
-                className={`px-3 py-1.5 transition-colors border lit ${
-                  pathname.startsWith("/properties")
-                    ? "bg-page border-ink-200 text-ink-900 font-semibold"
-                    : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
-                }`}
-              >
-                Properties
-              </Link>
-            </nav>
-          )}
+          <nav className="hidden sm:flex items-center space-x-1 text-xs font-medium">
+            <Link
+              href="/properties"
+              className={`px-3 py-1.5 transition-colors border lit ${
+                pathname.startsWith("/properties")
+                  ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                  : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+              }`}
+            >
+              Register
+            </Link>
+            <Link
+              href="/properties"
+              className="px-3 py-1.5 transition-colors border border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100 lit"
+            >
+              Comparison
+            </Link>
+            <Link
+              href="/report/sample"
+              className={`px-3 py-1.5 transition-colors border lit ${
+                pathname.startsWith("/report")
+                  ? "bg-page border-ink-200 text-ink-900 font-semibold"
+                  : "border-transparent text-ink-600 hover:text-ink-900 hover:border-ink-100"
+              }`}
+            >
+              Report
+            </Link>
+          </nav>
         </div>
 
         <div className="flex items-center space-x-3 text-xs">

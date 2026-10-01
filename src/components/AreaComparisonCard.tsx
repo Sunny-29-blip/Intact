@@ -464,14 +464,17 @@ export function AreaComparisonCard({
           </div>
 
           {findings.length === 0 ? (
-            <div className="p-6 bg-page border border-ink-200 text-center text-xs text-ink-600">
-              <span className="font-mono text-xs font-bold text-accepted block mb-1">
-                ✓ NO MEANINGFUL CHANGES FOUND
-              </span>
-              <p>
-                Visual surfaces match the baseline move-in photo with no detectable
-                damage or excessive normal wear.
+            <div className="p-6 bg-page border border-ink-200 text-left text-xs text-ink-700">
+              <div className="flex items-center space-x-2 text-accepted font-mono text-xs font-bold uppercase mb-1.5">
+                <span className="w-2 h-2 bg-accepted inline-block"></span>
+                <span>NO DIFFERENCES RECORDED</span>
+              </div>
+              <p className="text-xs text-ink-600 leading-relaxed font-sans mb-2">
+                This area was compared and no physical difference or damage was detected between the move-in baseline and move-out departure photographs.
               </p>
+              <div className="text-[10px] font-mono text-ink-500">
+                This area remains in the record as evidence of unchanged condition.
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -523,7 +526,7 @@ export function AreaComparisonCard({
                               : "bg-ink-900 text-white"
                           }`}
                         >
-                          {idx + 1}
+                          {String(idx + 1).padStart(2, "0")}
                         </span>
                         <div>
                           <p className="font-semibold text-ink-900 text-sm">
@@ -590,15 +593,15 @@ export function AreaComparisonCard({
                         Tenant Decision:
                       </span>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 font-mono text-xs">
                         <button
                           type="button"
                           aria-pressed={finding.decision === "accepted"}
                           onClick={() => handleDecision(finding, "accepted")}
                           disabled={updatingDecisionId === finding.id}
-                          className={`px-3 py-1 text-xs font-medium border transition-colors btn-motion ${
+                          className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider border transition-colors btn-motion ${
                             finding.decision === "accepted"
-                              ? "bg-accepted text-white border-accepted font-bold"
+                              ? "bg-accepted text-white border-accepted"
                               : "border-ink-200 hover:border-accepted text-ink-700 bg-surface lit"
                           }`}
                         >
@@ -613,14 +616,25 @@ export function AreaComparisonCard({
                             setDisputeNote(finding.decision_note || "");
                           }}
                           disabled={updatingDecisionId === finding.id}
-                          className={`px-3 py-1 text-xs font-medium border transition-colors btn-motion ${
+                          className={`px-3 py-1 text-xs font-semibold uppercase tracking-wider border transition-colors btn-motion ${
                             finding.decision === "disputed"
-                              ? "bg-disputed text-white border-disputed font-bold"
+                              ? "bg-disputed text-white border-disputed"
                               : "border-ink-200 hover:border-disputed text-ink-700 bg-surface lit"
                           }`}
                         >
                           Dispute
                         </button>
+
+                        {finding.decision !== "pending" && (
+                          <button
+                            type="button"
+                            onClick={() => handleDecision(finding, "pending" as any, "")}
+                            disabled={updatingDecisionId === finding.id}
+                            className="px-2 py-1 text-[10px] font-mono text-ink-500 hover:text-ink-900 underline"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
                     </div>
 
